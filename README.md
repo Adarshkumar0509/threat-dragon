@@ -6,8 +6,9 @@
 [![GitHub license](https://img.shields.io/github/license/owasp/threat-dragon.svg)](license.txt)
 [![Build status](https://img.shields.io/github/check-runs/OWASP/threat-dragon/main?label=CI)][build]
 [![GitHub release](https://img.shields.io/github/v/release/owasp/threat-dragon?sort=semver)][latest]
-[![OWASP Lab](https://img.shields.io/badge/owasp-lab%20project-f7b73c.svg)](https://owasp.org/projects/)
+[![OWASP Production](https://img.shields.io/badge/owasp-production%20project-brightgreen)](https://owasp.org/projects/)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9266/badge)][practices]
+[![analytics: Plausible](https://img.shields.io/badge/analytics-Plausible-5850EC?logo=plausibleanalytics&logoColor=white)](https://analytics.threatdragon.com/share/threatdragon.com?auth=aCV0lHHVgvub06ga4z9by)
 
 # OWASP Threat Dragon
 
@@ -17,7 +18,8 @@ It is used to draw threat modeling diagrams and to list threats for elements in 
 that provides an intuitive and accessible way to model threats.
 
 Threat Dragon is designed to be accessible for various types of teams, with an emphasis on flexibility and simplicity.
-It is an [OWASP Lab Project][project] and follows the values and principles of the [threat modeling manifesto][manifesto].
+The Project has [OWASP Production status][project] and follows the values and principles
+of the [threat modeling manifesto][manifesto].
 
 This program is free software: you can redistribute it and/or modify it
 under the terms of the [Apache 2.0 License][license].
@@ -62,7 +64,7 @@ stores the threat model files on the local filesystem and do not access external
 You can [download installers](https://github.com/OWASP/threat-dragon/releases) for Windows, MacOS and Linux.
 
 End user help is available for both the latest [version 2.x][docs]
-and the previous [version 1.x](https://owasp.org/www-project-threat-dragon/docs-1/).
+and the previous [version 1.x](https://threatdragon.github.io/).
 
 ### Version 1.x maintenance mode
 
@@ -147,8 +149,12 @@ please refer to the page for [contributors](contributing.md).
 There are some [developer notes][notes] to help get started with this project.
 We are trying to keep the test coverage relatively high so include tests in your pull requests.
 
-The easiest way to get in contact with the Threat Dragon community is via the OWASP Slack
-[#project-threat-dragon][td-slack] project channel (you may [need to subscribe][subscribe] first).
+### Contact
+
+The easiest way to get in contact with the Threat Dragon community is
+by emailing the [OWASP google group](mailto:threat-dragon-project@owasp.org).
+The OWASP Slack channel [#project-threat-dragon][td-slack] is a good source of information,
+although you may [need to subscribe][subscribe] first.
 
 You can follow the Threat Dragon on [Bluesky][bluesky].
 

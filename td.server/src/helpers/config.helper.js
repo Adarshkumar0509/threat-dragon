@@ -1,15 +1,16 @@
 import { isNullish, isString } from './validators.helper.js';
-import { ERROR_CODES } from '../constants/errorCodes.js';
+import { analyticsEventNames } from '../constants/analyticsEvents.js';
+import { errorCodes } from '../constants/errorCodes.js';
 
-const DEFAULT_LOCALE = 'en';
-const LOCALE_REGEX = /^[a-zA-Z]{2}(?:-[a-zA-Z]{2})?$/u;
+const fallbackLocale = 'en';
+const localeRegex = /^[a-zA-Z]{2}(?:-[a-zA-Z]{2})?$/u;
 const configError = (code, meta = {}) => ({ code, meta });
 
 export const normalizeLocale = (locale, intl = Intl) => {
     if (!isString(locale)) {return null;}
 
     const trimmed = locale.trim();
-    if (!LOCALE_REGEX.test(trimmed)) {return null;}
+    if (!localeRegex.test(trimmed)) {return null;}
 
     try {
         return intl.getCanonicalLocales(trimmed)[0];
@@ -20,20 +21,20 @@ export const normalizeLocale = (locale, intl = Intl) => {
 
 const toLocaleOrError = (entry, intl) => {
     if (!isString(entry)) {
-        return { error: configError(ERROR_CODES.CONFIG_LOCALE_TYPE, { type: typeof entry }) };
+        return { error: configError(errorCodes.CONFIG_LOCALE_TYPE, { type: typeof entry }) };
     }
 
     const trimmed = entry.trim();
 
-    if (!LOCALE_REGEX.test(trimmed)) {
-        return { error: configError(ERROR_CODES.CONFIG_LOCALE_FORMAT, { locale: entry }) };
+    if (!localeRegex.test(trimmed)) {
+        return { error: configError(errorCodes.CONFIG_LOCALE_FORMAT, { locale: entry }) };
     }
 
     const normalized = normalizeLocale(trimmed, intl);
 
     return normalized
         ? { value: normalized }
-        : { error: configError(ERROR_CODES.CONFIG_LOCALE_BCP47, { locale: entry }) };
+        : { error: configError(errorCodes.CONFIG_LOCALE_BCP47, { locale: entry }) };
 };
 
 
@@ -41,7 +42,7 @@ const parseLocaleInput = (raw) => {
     if (isNullish(raw)) {
         return {
             value: null,
-            errors: [configError(ERROR_CODES.CONFIG_LOCALE_MISSING)]
+            errors: [configError(errorCodes.CONFIG_LOCALE_MISSING)]
         };
     }
 
@@ -52,12 +53,12 @@ const parseLocaleInput = (raw) => {
             ? { value: parsed, errors: [] }
             : {
                 value: null,
-                errors: [configError(ERROR_CODES.CONFIG_LOCALE_NOT_ARRAY)]
+                errors: [configError(errorCodes.CONFIG_LOCALE_NOT_ARRAY)]
             };
     } catch {
         return {
             value: null,
-            errors: [configError(ERROR_CODES.CONFIG_LOCALE_PARSE)]
+            errors: [configError(errorCodes.CONFIG_LOCALE_PARSE)]
         };
     }
 };
@@ -96,11 +97,11 @@ const buildLocaleConfig = (config, intl) => {
         config.LOCALE_DEFAULT !== undefined;
 
     const normalizedDefault = normalizeLocale(config.LOCALE_DEFAULT, intl);
-    const defaultLocale = normalizedDefault || DEFAULT_LOCALE;
+    const defaultLocale = normalizedDefault || fallbackLocale;
 
     const defaultErrors =
         !normalizedDefault && hasDefault
-            ? [configError(ERROR_CODES.CONFIG_LOCALE_FORMAT, { locale: config.LOCALE_DEFAULT })]
+            ? [configError(errorCodes.CONFIG_LOCALE_FORMAT, { locale: config.LOCALE_DEFAULT })]
             : [];
 
     let mergedAllowed = allowedLocales;
@@ -133,6 +134,15 @@ export const buildConfig = (config, { intl = Intl } = {}) => {
     return {
         value: Object.freeze({
             ...buildOAuthFlags(config),
+            analytics: Object.freeze({
+                enabled: config.PLAUSIBLE_ENABLED === true,
+                dashboardUrl: config.PLAUSIBLE_ENABLED === true
+                    ? config.PLAUSIBLE_DASHBOARD_URL
+                    : null,
+                eventNames: Object.freeze(config.PLAUSIBLE_ENABLED === true
+                    ? [...analyticsEventNames]
+                    : [])
+            }),
             localEnabled: true,
             allowedLocales: Object.freeze([...localeConfig.allowedLocales]),
             defaultLocale: localeConfig.defaultLocale

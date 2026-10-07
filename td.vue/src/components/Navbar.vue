@@ -33,22 +33,6 @@
               :title="$t('nav.logOut')"></font-awesome-icon>
           </a>
         </li>
-        <!-- This is the dropdown from admin actions(manage templates) -->
-        <li v-if="isAdmin" class="nav-item td-admin-nav-dropdown">
-          <td-dropdown id="my-nav-dropdown" class="nav-link-custom" variant="link" right no-caret>
-            <template #button-content>
-              <font-awesome-icon icon="cog" class="td-fa-nav text-white" v-b-tooltip.hover
-                :title="$t('nav.contentManagement')" />
-            </template>
-
-            <template #default="{ close }">
-              <button type="button" class="td-dropdown-item" @click="onManageTemplates(); close()">
-                Manage Templates
-              </button>
-            </template>
-          </td-dropdown>
-        </li>
-
         <li class="nav-item" id="nav-docs">
           <a class="nav-link" href="https://www.threatdragon.com/docs/" target="_blank" rel="noopener noreferrer">
             <font-awesome-icon icon="question-circle" class="td-fa-nav" v-b-tooltip.hover
@@ -70,6 +54,13 @@
               alt="OWASP Threat Dragon" />
           </a>
         </li>
+        <li v-if="analyticsEnabled" class="nav-item" id="nav-analytics">
+          <a class="nav-link" :href="analyticsDashboardUrl" target="_blank"
+            rel="noopener noreferrer" aria-label="Analytics enabled: view public dashboard"
+            title="Analytics enabled: view public dashboard">
+            <font-awesome-icon icon="chart-line" class="td-fa-nav td-analytics-icon"></font-awesome-icon>
+          </a>
+        </li>
       </ul>
     </div>
   </nav>
@@ -77,6 +68,7 @@
 
 <style lang="scss" scoped>
 $icon-height: 1.2rem;
+$analytics-blue: #00a8ff;
 
 .navbar {
   background-color: $orange;
@@ -123,6 +115,29 @@ $icon-height: 1.2rem;
   background-color: transparent;
 }
 
+.td-analytics-icon {
+  animation: analytics-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes analytics-pulse {
+  0%,
+  100% {
+    color: $white;
+    opacity: 0.85;
+  }
+
+  50% {
+    color: $analytics-blue;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .td-analytics-icon {
+    animation: none;
+  }
+}
+
 @media (max-width: 576px) {
 
   /* This is the typical breakpoint for phones */
@@ -152,14 +167,12 @@ import { mapGetters } from 'vuex';
 
 import threatDragonLogo from '@/assets/threatdragon_logo_image.svg';
 import owaspLogo from '@/assets/owasp.svg';
-import { LOGOUT } from '@/store/actions/auth.js';
-import TdDropdown from './Dropdown.vue';
+import { logout } from '@/store/actions/auth.js';
 import TdLocaleSelect from './LocaleSelect.vue';
 
 export default {
     name: 'TdNavbar',
     components: {
-        TdDropdown,
         TdLocaleSelect
     },
     data() {
@@ -172,7 +185,9 @@ export default {
     computed: {
         ...mapGetters([
             'username',
-            'isAdmin'
+            'isAdmin',
+            'analyticsEnabled',
+            'analyticsDashboardUrl'
         ])
     },
     methods: {
@@ -186,14 +201,7 @@ export default {
                     throw error;
                 }
             });
-            await this.$store.dispatch(LOGOUT);
-        },
-        onManageTemplates() {
-            this.$router.push('/admin/templates').catch(error => {
-                if (error.name != 'NavigationDuplicated') {
-                    throw error;
-                }
-            });
+            await this.$store.dispatch(logout);
         }
     }
 };

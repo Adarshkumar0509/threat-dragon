@@ -49,13 +49,14 @@ import TdKeyboardShortcuts from '@/components/KeyboardShortcuts.vue';
 import TdThreatEditDialog from '@/components/ThreatEditDialog.vue';
 import TdThreatSuggestDialog from './ThreatSuggestDialog.vue';
 
-import { DESKTOP_DIAGRAM_SAVE_REQUEST_EVENT } from '@/service/desktop/save.js';
+import { desktopDiagramSaveRequestEvent } from '@/service/desktop/save.js';
 import { getProviderType } from '@/service/provider/providers.js';
 import { providerTypes } from '@/service/provider/providerTypes.js';
 import diagramService from '@/service/diagram/diagram.js';
 import saveDiagram from '@/service/diagram/save.js';
 import stencil from '@/service/x6/stencil.js';
 import tmActions from '@/store/actions/threatmodel.js';
+import analytics, { methodologyForDiagramType } from '@/service/analytics.js';
 
 export default {
     name: 'TdGraph',
@@ -78,9 +79,13 @@ export default {
     },
     async mounted() {
         this.init();
+        analytics.startEditing('diagram');
+        analytics.track('DIAGRAM_METHODOLOGY_USED', {
+            methodology: methodologyForDiagramType(this.diagram.diagramType)
+        });
         if (this.providerType === providerTypes.desktop) {
             this.desktopSaveRequestHandler = () => this.handleDesktopSaveRequest();
-            window.addEventListener(DESKTOP_DIAGRAM_SAVE_REQUEST_EVENT, this.desktopSaveRequestHandler);
+            window.addEventListener(desktopDiagramSaveRequestEvent, this.desktopSaveRequestHandler);
         }
     },
     methods: {
@@ -129,8 +134,9 @@ export default {
         }
     },
     unmounted() {
+        analytics.finishEditing();
         if (this.desktopSaveRequestHandler) {
-            window.removeEventListener(DESKTOP_DIAGRAM_SAVE_REQUEST_EVENT, this.desktopSaveRequestHandler);
+            window.removeEventListener(desktopDiagramSaveRequestEvent, this.desktopSaveRequestHandler);
         }
         diagramService.dispose(this.graph);
     }

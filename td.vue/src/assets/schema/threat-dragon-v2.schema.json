@@ -358,7 +358,7 @@
                             "type": "string"
                           },
                           "status": {
-                            "description": "The threat status as NA, Open or Mitigated",
+                            "description": "The threat status as NA, Open, Mitigated, Accepted, Transferred, Avoided or Eliminated",
                             "type": "string"
                           },
                           "threatId": {
@@ -432,6 +432,14 @@
         }
       },
       "required": [ "contributors", "diagrams", "diagramTop", "reviewer", "threatTop" ]
+    },
+    "release_version": {
+      "description": "The release version of the model",
+      "type": "string"
+    },
+    "released_at": {
+      "description": "The release date of the model",
+      "type": "string"
     }
   },
   "required": [ "version", "summary", "detail" ]

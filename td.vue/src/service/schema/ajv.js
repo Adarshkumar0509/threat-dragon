@@ -5,7 +5,6 @@ const schemaV1 = require('@/assets/schema/threat-dragon-v1.schema');
 const schemaV2 = require('@/assets/schema/threat-dragon-v2.schema');
 const schemaOtm = require('@/assets/schema/open-threat-model.schema');
 const schemaTmbom = require('@/assets/schema/threat-model.schema');
-const schemaTemplate = require('@/assets/schema/owasp-threat-dragon-template.schema.json');
 
 const ajv = new Ajv({'allowUnionTypes' : true});
 addFormats(ajv);
@@ -14,35 +13,23 @@ const validateV1 = ajv.compile(schemaV1);
 const validateV2 = ajv.compile(schemaV2);
 const validateOtm = ajv.compile(schemaOtm);
 const validateTmbom = ajv.compile(schemaTmbom);
-const validateTemplate = ajv.compile(schemaTemplate);
 
 export const isValid = (jsonFile) => {
 
-    // use the latest V2 schema, save errors for later if needed
-    if (isV2(jsonFile)) {
+    if (isV2(jsonFile)) { // try the latest V2 schema
         console.debug('Schema validate success');
-        return true;
-    }
-
-    // try the V1 schema
-    if (isV1(jsonFile)) {
+    } else if (isV1(jsonFile)) { // try the V1 schema
         console.debug('Schema validate success for V1.x model');
-        return true;
+    } else if (isTmBom(jsonFile)) { // try other formats
+        console.debug('Schema validate success for Threat Model in TM-BOM');
+    } else if (isOtm(jsonFile)) {
+        console.debug('Schema validate success for Open Threat Model');
+    } else {
+        console.warn('Failed to validate', validateV2.errors);
+        return false;
     }
 
-    // if it is not in either Threat Dragon formats, maybe another format
-    if (isTmBom(jsonFile)) {
-	    console.debug('Schema validate success for Threat Model in TM-BOM');
-	    return true;
-    }
-
-    if (isOtm(jsonFile)) {
-	    console.debug('Schema validate success for Open Threat Model');
-	    return true;
-    }
-
-    console.warn('Failed to validate', validateV2.errors);
-    return false;
+    return true;
 };
 
 export const checkV2 = (jsonFile) => {
@@ -58,40 +45,31 @@ export const isV2 = (jsonFile) => {
     return validateV2(jsonFile);
 };
 
-export const isTmBom = (jsonFile) => {
+const isTmBom = (jsonFile) => {
     return validateTmbom(jsonFile);
 };
 
-export const checkTmBom = (jsonFile) => {
+const checkTmBom = (jsonFile) => {
     validateTmbom(jsonFile);
     return validateTmbom.errors;
 };
 
-export const isOtm = (jsonFile) => {
+const isOtm = (jsonFile) => {
     return validateOtm(jsonFile);
 };
 
-export const isTemplate = (jsonFile) => {
-    return validateTemplate(jsonFile);
-};
-
-export const validateTemplateFormat = (jsonFile) => {
-    if (validateTemplate(jsonFile)) {
-        console.debug('Schema validate success for Template format');
-        return { valid: true, errors: null };
-    }
-    console.warn('Failed to validate template', validateTemplate.errors);
-    return { valid: false, errors: validateTemplate.errors };
+const checkOtm = (jsonFile) => {
+    validateOtm(jsonFile);
+    return validateOtm.errors;
 };
 
 export default {
+    checkOtm,
     checkTmBom,
     checkV2,
     isV1,
     isV2,
     isOtm,
     isTmBom,
-    isValid,
-    isTemplate,
-    validateTemplateFormat
+    isValid
 };

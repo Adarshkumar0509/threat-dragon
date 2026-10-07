@@ -1,19 +1,29 @@
-import BootstrapVue from 'bootstrap-vue';
-import { createLocalVue, shallowMount } from '@vue/test-utils';
+import { shallowMount } from '@vue/test-utils';
 import Vuex from 'vuex';
 
+import { createLocalVue } from '../helpers/vueTestUtils';
+
 import ReportModel from '@/views/ReportModel.vue';
+import { isDesktopApp } from '@/service/environment';
 import TdCoversheet from '@/components/report/Coversheet.vue';
 import TdDiagramDetail from '@/components/report/DiagramDetail.vue';
 import TdExecutiveSummary from '@/components/report/ExecutiveSummary.vue';
+import analytics from '@/service/analytics.js';
+
+jest.mock('@/service/environment', () => ({
+    isDesktopApp: jest.fn()
+}));
+jest.mock('@/service/analytics.js', () => ({
+    track: jest.fn()
+}));
 
 describe('views/ReportModel.vue', () => {
     let routerMock, storeMock, wrapper;
 
     beforeEach(() => {
+        analytics.track.mockClear();
         const localVue = createLocalVue();
         localVue.use(Vuex);
-        localVue.use(BootstrapVue);
 
         routerMock = { push: jest.fn(), params: {} };
         storeMock = new Vuex.Store({
@@ -118,5 +128,68 @@ describe('views/ReportModel.vue', () => {
         window.print.mockImplementation(() => {});
         wrapper.vm.print();
         expect(window.print).toHaveBeenCalledTimes(1);
+    });
+
+    it('tracks a print request without report contents', () => {
+        wrapper.vm.print();
+        expect(analytics.track).toHaveBeenCalledWith('THREAT_MODEL_REPORT_PRINT_REQUESTED', { format: 'PRINT' });
+    });
+});
+
+describe('ReportModel.vue — desktop app', () => {
+    let routerMock, storeMock, wrapper;
+
+    beforeEach(() => {
+        isDesktopApp.mockReturnValue(true);
+        window.electronAPI = { modelPrint: jest.fn() };
+
+        const localVue = createLocalVue();
+        localVue.use(Vuex);
+
+        routerMock = { push: jest.fn(), params: {} };
+        storeMock = new Vuex.Store({
+            state: {
+                threatmodel: {
+                    data: {
+                        summary: { title: 'My title', owner: 'some owner', description: 'Aweomse sauce' },
+                        detail: {
+                            reviewer: 'Reviewer',
+                            contributors: ['Contribs'],
+                            diagrams: [{ cells: [{ threats: [{ foo: 'bar' }] }] }]
+                        }
+                    }
+                },
+                provider: { selected: 'local' }
+            },
+            getters: { contributors: () => [] }
+        });
+        wrapper = shallowMount(ReportModel, {
+            localVue,
+            store: storeMock,
+            mocks: {
+                $route: routerMock,
+                $router: routerMock,
+                $t: t => t
+            }
+        });
+    });
+
+    afterEach(() => {
+        isDesktopApp.mockReturnValue(false);
+        delete window.electronAPI;
+    });
+
+    it('shows the PDF export button', () => {
+        expect(wrapper.findComponent('#td-print-pdf-btn').exists()).toEqual(true);
+    });
+
+    it('calls electronAPI.modelPrint on printPdf', () => {
+        wrapper.vm.printPdf();
+        expect(window.electronAPI.modelPrint).toHaveBeenCalledWith('PDF');
+    });
+
+    it('does not track a PDF report export in the desktop app', () => {
+        wrapper.vm.printPdf();
+        expect(analytics.track).not.toHaveBeenCalled();
     });
 });

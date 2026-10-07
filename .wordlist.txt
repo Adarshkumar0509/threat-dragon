@@ -9,6 +9,7 @@ AppImage
 ara
 Atlassian
 auth
+Az
 backend
 Backend
 Bahasa
@@ -32,6 +33,7 @@ Config
 cooldowns
 cooldown
 cron
+Cloudflare
 CVE
 CVEs
 CVSS
@@ -44,6 +46,7 @@ Detectability
 deu
 Deutsch
 dev
+dili
 dmg
 Dockerfile
 dockerhub
@@ -52,6 +55,7 @@ DoS
 dotenv
 DotEnv
 dropdown
+durations
 eg
 eng
 env
@@ -106,6 +110,7 @@ ModelRef
 msa
 namespaced
 nav
+nightlies
 npm
 npx
 NSIS
@@ -116,6 +121,7 @@ orchestrator
 OSX
 owasp
 OWASP
+Pageviews
 pdf
 px
 PNG
@@ -127,6 +133,8 @@ pre
 PRs
 PWD
 pyspelling
+rbaycan
+README
 remediations
 renderer
 repo
@@ -151,6 +159,7 @@ td
 threatdragon
 ThreatDragonModels
 TLS
+tmBOM
 Trisqel
 trivy
 Trivy
@@ -176,3 +185,10 @@ LLMs
 InfoSecOTB
 LLM
 LiteLLM
+config
+hardcoded
+getter
+canonicalizes
+selectable
+uncomment
+Vuex

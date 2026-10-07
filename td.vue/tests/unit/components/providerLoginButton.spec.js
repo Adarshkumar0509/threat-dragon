@@ -1,11 +1,11 @@
-import { BButton, BootstrapVue } from 'bootstrap-vue';
+import { shallowMount } from '@vue/test-utils';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { shallowMount, createLocalVue } from '@vue/test-utils';
 import Vuex from 'vuex';
 
-import { AUTH_SET_LOCAL } from '@/store/actions/auth.js';
+import { createLocalVue } from '../helpers/vueTestUtils';
+import { authSetLocal } from '@/store/actions/auth.js';
 import loginApi from '@/service/api/loginApi.js';
-import { PROVIDER_SELECTED } from '@/store/actions/provider.js';
+import { providerSelected } from '@/store/actions/provider.js';
 import TdProviderLoginButton from '@/components/ProviderLoginButton.vue';
 
 describe('components/ProviderLoginButton.vue', () => {
@@ -17,14 +17,13 @@ describe('components/ProviderLoginButton.vue', () => {
     });
     const getMockStore = () => ({
         actions: {
-            [AUTH_SET_LOCAL]: () => {},
-            [PROVIDER_SELECTED]: () => {}
+            [authSetLocal]: () => {},
+            [providerSelected]: () => {}
         }
     });
 
     const mountWithProvider = () => {
         localVue = createLocalVue();
-        localVue.use(BootstrapVue);
         localVue.component('font-awesome-icon', FontAwesomeIcon);
         localVue.use(Vuex);
         
@@ -54,7 +53,7 @@ describe('components/ProviderLoginButton.vue', () => {
                 provider = getProvider();
                 provider.key = 'local';
                 mountWithProvider();
-                await wrapper.findComponent(BButton).trigger('click');
+                await wrapper.findComponent({ name: 'BButton' }).trigger('click');
             });
 
             it('reads the provider value', () => {
@@ -62,7 +61,7 @@ describe('components/ProviderLoginButton.vue', () => {
             });
     
             it('uses a bootstrap button', () => {
-                expect(wrapper.findComponent(BButton).exists()).toEqual(true);
+                expect(wrapper.findComponent({ name: 'BButton' }).exists()).toEqual(true);
             });
     
             it('uses a font awesome icon', () => {
@@ -70,11 +69,11 @@ describe('components/ProviderLoginButton.vue', () => {
             });
 
             it('dipatches the provider selected event', () => {
-                expect(mockStore.dispatch).toHaveBeenCalledWith(PROVIDER_SELECTED, provider.key);
+                expect(mockStore.dispatch).toHaveBeenCalledWith(providerSelected, provider.key);
             });
 
             it('dispatches the set local event', () => {
-                expect(mockStore.dispatch).toHaveBeenCalledWith(AUTH_SET_LOCAL);
+                expect(mockStore.dispatch).toHaveBeenCalledWith(authSetLocal);
             });
 
             it('navigates to the dashboard', () => {
@@ -87,11 +86,11 @@ describe('components/ProviderLoginButton.vue', () => {
                 provider = getProvider();
                 jest.spyOn(loginApi, 'loginAsync').mockResolvedValue({ data: '' });
                 mountWithProvider();
-                await wrapper.findComponent(BButton).trigger('click');
+                await wrapper.findComponent({ name: 'BButton' }).trigger('click');
             });
 
             it('dipatches the provider selected event', () => {
-                expect(mockStore.dispatch).toHaveBeenCalledWith(PROVIDER_SELECTED, provider.key);
+                expect(mockStore.dispatch).toHaveBeenCalledWith(providerSelected, provider.key);
             });
 
             it('calls the login api', () => {

@@ -71,6 +71,8 @@ regardless of whether the contributor is carbon-based, silicon-based, or legally
 - Breaking changes requiring a Threat Dragon major version bump are prohibited.
 - Comments should explain non-obvious constraints or decisions only. Avoid comments that restate the code.
 - Treat auth, tokens, repository access, file access, and generated artifacts as security-sensitive surfaces.
+- Analytics must never be tracked in the desktop or standalone front-end: they are opt-in only via
+  server configuration and preserve privacy. The server must explicitly allow-list events.
 - Pull requests must be tightly scoped and easily reviewed by maintainers. Humans will be reviewing all changes
   - PRs with > 20 files are not sustainable.
   - Break it down into smaller practical PRs, OR
@@ -102,6 +104,8 @@ Use the workflows in `.github/workflows/` as the source of truth.
 Before handoff, run the relevant local checks and say exactly what was not run.
 Not all quality gates are required for every change: if only working in `td.vue`,
 only those quality gates are required to be run.
+
+When debugging CI, start with `scripts/td-pr-check.sh`
 
 ### td.vue
 
@@ -150,6 +154,7 @@ The following quality gates are required when changes are made in `td.server`:
 - Desktop specific code should be electron-specific code, or for a feature that only exists for desktop.
   - For most features, prefer updating the Vue app.
 - Never make breaking changes that would require a semver major version bump of Threat Dragon
+- When adding a new translation, add the new key and the default (English) value to all translation files.
 
 ### `td.server/`
 

@@ -55,6 +55,36 @@
                     </b-form-row>
 
                     <b-form-row>
+                        <b-col md=6>
+                            <b-form-group
+                                id="release-version-group"
+                                :label="$t('threatmodel.releaseVersion')"
+                                label-for="release-version">
+                                <b-form-input
+                                    id="release-version"
+                                    v-model="model.release_version"
+                                    @input="onModifyModel()"
+                                    type="text">
+                                </b-form-input>
+                            </b-form-group>
+                        </b-col>
+
+                        <b-col md=6>
+                            <b-form-group
+                                id="released-at-group"
+                                :label="$t('threatmodel.releasedAt')"
+                                label-for="released-at">
+                                <b-form-input
+                                    id="released-at"
+                                    v-model="model.released_at"
+                                    @input="onModifyModel()"
+                                    type="date">
+                                </b-form-input>
+                            </b-form-group>
+                        </b-col>
+                    </b-form-row>
+
+                    <b-form-row>
                         <b-col>
                             <b-form-group
                                 id="description-group"
@@ -100,12 +130,12 @@
                             v-for="(diagram, idx) in model.detail.diagrams"
                             :key="idx"
                         >
-                            <b-input-group
+                            <td-input-group
                                 :id="`diagram-group-${idx}`"
                                 :label-for="`diagram-${idx}`"
                                 class="mb-3"
                             >
-                                <b-input-group-prepend>
+                                <template #prepend>
                                     <td-dropdown variant="secondary" class="select-diagram-type" :text="model.detail.diagrams[idx].diagramType === 'EOP' ? $t('threatmodel.diagram.eop.select') : model.detail.diagrams[idx].diagramType">
                                         <template #default="{ close }">
                                             <button type="button" class="td-dropdown-item" @click="onDiagramTypeClick(idx, 'CIA'); close()">{{ $t('threatmodel.diagram.cia.select') }}</button>
@@ -117,7 +147,7 @@
                                             <button type="button" class="td-dropdown-item" @click="onDiagramTypeClick(idx, 'Generic'); close()">{{ $t('threatmodel.diagram.generic.select') }}</button>
                                         </template>
                                     </td-dropdown>
-                                </b-input-group-prepend>
+                                </template>
                                 <b-form-input
                                     v-model="model.detail.diagrams[idx].title"
                                     type="text"
@@ -129,7 +159,7 @@
                                     type="text"
                                     class="td-diagram-description"
                                 ></b-form-input>
-                                <b-input-group-append>
+                                <template #append>
                                     <b-button variant="primary" class="td-duplicate-diagram" @click="onDuplicateDiagramClick(idx)">
                                         <font-awesome-icon icon="clone"></font-awesome-icon>
                                         {{ $t('forms.duplicate') }}
@@ -138,8 +168,8 @@
                                         <font-awesome-icon icon="times"></font-awesome-icon>
                                         {{ $t('forms.remove') }}
                                     </b-button>
-                                </b-input-group-append>
-                            </b-input-group>
+                                </template>
+                            </td-input-group>
                         </b-col>
                     </b-form-row>
 
@@ -203,14 +233,22 @@ import { getProviderType } from '@/service/provider/providers.js';
 import TdDropdown from '@/components/Dropdown.vue';
 import TdFormButton from '@/components/FormButton.vue';
 import TdFormTags from '@/components/FormTags.vue';
+import TdInputGroup from '@/components/InputGroup.vue';
 import tmActions from '@/store/actions/threatmodel.js';
+import analytics, { methodologyForDiagramType } from '@/service/analytics.js';
 
 export default {
     name: 'ThreatModelEdit',
     components: {
         TdDropdown,
         TdFormButton,
-        TdFormTags
+        TdFormTags,
+        TdInputGroup
+    },
+    data() {
+        return {
+            createdDiagramIds: []
+        };
     },
     computed: {
         ...mapState({
@@ -232,6 +270,7 @@ export default {
     },
     async mounted() {
         this.init();
+        analytics.startEditing('threat_model');
     },
     methods: {
         init() {
@@ -255,6 +294,7 @@ export default {
                 const result = await this.$store.dispatch(tmActions.create);
                 // Only navigate to edit route if create was successful
                 if (result) {
+                    this.trackCreatedDiagrams();
                     const params = Object.assign({}, this.$route.params, {
                         threatmodel: this.model.summary.title
                     });
@@ -262,6 +302,7 @@ export default {
                 }
             } else {
                 await this.$store.dispatch(tmActions.saveModel);
+                if (!this.$store.getters.modelChanged) this.trackCreatedDiagrams();
             }
         },
         async onReloadClick(evt) {
@@ -286,7 +327,19 @@ export default {
             };
             this.$store.dispatch(tmActions.update, { diagramTop: this.diagramTop + 1 });
             this.model.detail.diagrams.push(newDiagram);
+            this.createdDiagramIds.push(newDiagram.id);
             this.$store.dispatch(tmActions.modified);
+        },
+        trackCreatedDiagrams() {
+            this.createdDiagramIds.forEach((diagramId) => {
+                const diagram = this.model.detail.diagrams.find((item) => item.id === diagramId);
+                if (diagram) {
+                    analytics.track('DIAGRAM_CREATED', {
+                        methodology: methodologyForDiagramType(diagram.diagramType)
+                    });
+                }
+            });
+            this.createdDiagramIds = [];
         },
         onDiagramTypeClick(idx, type) {
             let defaultTitle;
@@ -386,6 +439,9 @@ export default {
                 centered: true
             });
         }
+    },
+    unmounted() {
+        analytics.finishEditing();
     }
 };
 

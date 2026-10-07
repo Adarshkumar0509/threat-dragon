@@ -1,49 +1,413 @@
-// tests used to ensure the welcome page has the required components
+import homepageStrings from '../fixtures/homepage-strings.json';
+
+const allSupported = [
+    'ar', 'az', 'de', 'el', 'en', 'es', 'fi', 'fr',
+    'hi', 'id', 'ja', 'ms', 'pt', 'pt-BR', 'zh'
+];
+
+const providers = [
+    'github-login-btn',
+    'bitbucket-login-btn',
+    'gitlab-login-btn',
+    'google-login-btn',
+    'local-login-btn'
+];
+
+const defaultConfig = {
+    githubEnabled: false,
+    bitbucketEnabled: false,
+    gitlabEnabled: false,
+    googleEnabled: false,
+    localEnabled: true,
+    allowedLocales: [],
+    defaultLocale: 'en'
+};
+
+const phoneWidth = 375;
+const phoneHeight = 812;
+
+// The narrowest viewport this suite guards: 320px is the floor for phones still
+// in use. Wider phones sit in the same class as the 375px cases below.
+const narrowPhoneWidth = 320;
+const narrowPhoneHeight = 568;
+
+const allProvidersEnabled = {
+    githubEnabled: true,
+    bitbucketEnabled: true,
+    gitlabEnabled: true,
+    googleEnabled: true
+};
+
+// innerWidth includes the vertical scrollbar: CI Chromium draws a classic one that
+// clientWidth excludes, while phones overlay theirs on the content.
+const expectNoSidewaysScroll = () => {
+    cy.window().should((win) => {
+        expect(win.document.documentElement.scrollWidth)
+            .to.be.at.most(win.innerWidth);
+    });
+};
+
+const loadWithConfig = (overrides = {}, alias = 'getConfig') => {
+    cy.intercept('GET', '/api/config', {
+        statusCode: 200,
+        body: {
+            status: 200,
+            data: { ...defaultConfig, ...overrides }
+        }
+    }).as(alias);
+
+    cy.visit('/');
+    cy.wait(`@${alias}`);
+    cy.get('.td-spinner', { timeout: 10000 }).should('not.exist');
+};
+
+const verifyProviderButtons = (expected) => {
+    providers.forEach((id) => {
+        const shouldExist = expected.includes(id);
+        cy.get(`#${id}`).should(shouldExist ? 'be.visible' : 'not.exist');
+    });
+};
+
+const verifyExternalUrl = (selector, url) => {
+    cy.get(selector)
+        .find('a')
+        .should('have.attr', 'href', url)
+        .and('have.attr', 'rel', 'noopener noreferrer');
+};
+
 
 describe('home', () => {
-    describe('login', () => {
-        it('has a welcome message', () => {
-            cy.contains('OWASP Threat Dragon');
-        });
-    
-        it('describes the application', () => {
-            cy.contains('OWASP Threat Dragon is');
-        });
-    
-        it('shows the threat dragon logo', () => {
-            cy.get('#home-td-logo').should('be.visible');
-        });
-    
-        it('always displays local login option', () => {
-            cy.get('#local-login-btn').should('be.visible');
-        });
-    });
 
     describe('navbar', () => {
-        const verifyExternalUrl = (selector, url) => {
-            cy.get(selector)
-                .find('a')
-                .should('have.attr', 'href', url)
-                .and('have.attr', 'rel', 'noopener noreferrer');
-        };
-    
+        beforeEach(() => {
+            cy.launchThreatDragon();
+        });
+
         it('has a link to the home page', () => {
-            cy.get('.navbar-brand').should('have.attr', 'href').and('contain', '#/');
+            cy.get('.navbar-brand')
+                .should('have.attr', 'href')
+                .and('contain', '#/');
         });
-        
-        it('links to the threat dragon docs', () => {
-            verifyExternalUrl('#nav-docs', 'https://www.threatdragon.com/docs/');
+
+        it('links to docs', () => {
+            verifyExternalUrl(
+                '#nav-docs',
+                'https://www.threatdragon.com/docs/'
+            );
         });
-    
-        it('links to the OWASP Threat Modeling Cheat Sheet', () => {
+
+        it('links to cheat sheet', () => {
             verifyExternalUrl(
                 '#nav-tm-cheat-sheet',
                 'https://cheatsheetseries.owasp.org/cheatsheets/Threat_Modeling_Cheat_Sheet.html'
             );
         });
-    
-        it('links to the OWASP Threat Dragon page', () => {
-            verifyExternalUrl('#nav-owasp-td', 'https://owasp.org/www-project-threat-dragon/');
+
+        it('links to OWASP page', () => {
+            verifyExternalUrl(
+                '#nav-owasp-td',
+                'https://owasp.org/www-project-threat-dragon/'
+            );
+        });
+    });
+
+    describe('locale — translated content', () => {
+        afterEach(() => {
+            cy.window().then((win) => win.sessionStorage.clear());
+        });
+
+        allSupported.forEach((locale) => {
+            it(`displays correct content for ${locale}`, () => {
+                const isDefault = locale === 'en';
+
+                loadWithConfig({
+                    githubEnabled: true,
+                    allowedLocales: isDefault ? [] : [locale],
+                    defaultLocale: locale
+                });
+
+                const strings = homepageStrings[locale];
+                if (!strings) {
+                    cy.log(`Missing fixture for ${locale}`);
+                    return;
+                }
+
+                cy.get('h1.display-3').should('contain.text', strings.title);
+                cy.get('p.td-description').should('contain.text', strings.description);
+                cy.get('#local-login-btn').should('contain.text', strings.loginButton);
+                cy.get('.td-dropdown-toggle').should('contain.text', strings.dropdownLabel);
+            });
+        });
+    });
+
+    describe('provider buttons — config-driven visibility', () => {
+        beforeEach(() => {
+            cy.window().then((win) => win.sessionStorage.clear());
+        });
+
+        it('shows all providers when all enabled', () => {
+            loadWithConfig({
+                githubEnabled: true,
+                bitbucketEnabled: true,
+                gitlabEnabled: true,
+                googleEnabled: true,
+                localEnabled: true
+            });
+
+            verifyProviderButtons(providers);
+        });
+
+        it('shows only github + local', () => {
+            loadWithConfig({
+                githubEnabled: true
+            });
+
+            verifyProviderButtons(['github-login-btn', 'local-login-btn']);
+        });
+
+        it('shows only bitbucket + local', () => {
+            loadWithConfig({
+                bitbucketEnabled: true
+            });
+
+            verifyProviderButtons(['bitbucket-login-btn', 'local-login-btn']);
+        });
+
+        it('shows only gitlab + local', () => {
+            loadWithConfig({
+                gitlabEnabled: true
+            });
+
+            verifyProviderButtons(['gitlab-login-btn', 'local-login-btn']);
+        });
+
+        it('shows only google + local', () => {
+            loadWithConfig({
+                googleEnabled: true
+            });
+
+            verifyProviderButtons(['google-login-btn', 'local-login-btn']);
+        });
+
+        it('shows only local when all disabled', () => {
+            loadWithConfig({
+                githubEnabled: false,
+                bitbucketEnabled: false,
+                gitlabEnabled: false,
+                googleEnabled: false,
+                localEnabled: true
+            });
+
+            verifyProviderButtons(['local-login-btn']);
+        });
+
+        it('falls back to local on network error', () => {
+            cy.intercept('GET', '/api/config', {
+                forceNetworkError: true
+            }).as('getConfigFail');
+
+            cy.visit('/');
+            cy.wait('@getConfigFail');
+
+            cy.get('.td-spinner').should('not.exist');
+            verifyProviderButtons(['local-login-btn']);
+        });
+
+        it('falls back to local on empty config', () => {
+            cy.intercept('GET', '/api/config', {
+                statusCode: 200,
+                body: { status: 200, data: {} }
+            }).as('getConfig');
+
+            cy.visit('/');
+            cy.wait('@getConfig');
+
+            cy.get('.td-spinner').should('not.exist');
+            verifyProviderButtons(['local-login-btn']);
+        });
+    });
+
+    describe('analytics opt-in', () => {
+        it('does not post analytics when the server does not enable it', () => {
+            cy.intercept('POST', '/api/analytics').as('analytics');
+            loadWithConfig();
+            cy.get('@analytics.all').should('have.length', 0);
+            cy.get('#nav-analytics').should('not.exist');
+        });
+
+        it('shows the indicator and uses only the server endpoint when enabled', () => {
+            cy.intercept('POST', '/api/analytics', { statusCode: 204 }).as('analytics');
+            cy.intercept('POST', 'https://plausible.test/**').as('directPlausible');
+            loadWithConfig({
+                analytics: {
+                    enabled: true,
+                    dashboardUrl: 'https://plausible.test/share/threatdragon',
+                    eventNames: ['PAGE_VIEW_HOME']
+                }
+            });
+            cy.wait('@analytics').its('request.body').should('deep.equal', { event: 'PAGE_VIEW_HOME' });
+            cy.get('#nav-analytics a')
+                .should('have.attr', 'href', 'https://plausible.test/share/threatdragon')
+                .and('have.attr', 'rel', 'noopener noreferrer');
+            cy.get('@directPlausible.all').should('have.length', 0);
+        });
+    });
+
+    describe('loading state', () => {
+        it('shows the loading indicator while loading config', () => {
+            cy.intercept('GET', '/api/config', (req) => {
+                req.on('response', (res) => {
+                    res.setDelay(500);
+                });
+                req.continue();
+            }).as('slowConfig');
+
+            cy.visit('/');
+            cy.get('.td-spinner').should('be.visible');
+
+            cy.wait('@slowConfig');
+            cy.get('.td-spinner').should('not.exist');
+        });
+
+        it('hides the loading indicator after success', () => {
+            cy.launchThreatDragon();
+            cy.get('.td-spinner').should('not.exist');
+        });
+
+        it('hides the loading indicator after error', () => {
+            cy.intercept('GET', '/api/config', {
+                statusCode: 500,
+                body: { status: 500, error: 'Server error' }
+            }).as('failConfig');
+
+            cy.visit('/');
+            cy.wait('@failConfig');
+
+            cy.get('.td-spinner').should('not.exist');
+        });
+    });
+
+    describe('mobile layout', () => {
+        const mdWidth = 768;
+        const belowMdWidth = mdWidth - 1;
+        const logoWidth = 400;
+        const logoSideMargin = '20px';
+        const noSideMargin = '0px';
+        const descriptionIndentFromMd = '170px';
+        const descriptionIndentBelowMd = '20px';
+        const loginIndentFromMd = '48px';
+
+        const rightEdge = ($el) => $el[0].getBoundingClientRect().right;
+
+        // The hero pads its content by 1rem, so its border-box edge would leave
+        // an element 16px of slack to overflow the column and still pass.
+        const contentRightEdge = ($el) => {
+            const el = $el[0];
+            return rightEdge($el) - parseFloat(getComputedStyle(el).paddingRight);
+        };
+
+        const expectWithinHero = (selector) => {
+            cy.get('.td-hero').then(($hero) => {
+                cy.get(selector).then(($el) => {
+                    expect(rightEdge($el)).to.be.at.most(contentRightEdge($hero));
+                });
+            });
+        };
+
+        const expectLogoSideMargins = (expected) => {
+            cy.get('#home-td-logo')
+                .should('have.css', 'margin-left', expected)
+                .and('have.css', 'margin-right', expected);
+        };
+
+        beforeEach(() => {
+            cy.viewport(phoneWidth, phoneHeight);
+            cy.launchThreatDragon();
+        });
+
+        it('shrinks the logo to fit the screen', () => {
+            cy.get('#home-td-logo').invoke('outerWidth', true).should('be.lessThan', phoneWidth);
+        });
+
+        it('keeps the logo inside the hero', () => {
+            expectWithinHero('#home-td-logo');
+        });
+
+        it('keeps the logo at full size from md up', () => {
+            cy.viewport(mdWidth, phoneHeight);
+            cy.get('#home-td-logo').invoke('outerWidth').should('equal', logoWidth);
+        });
+
+        it('keeps the description inside the hero', () => {
+            expectWithinHero('p.td-description');
+        });
+
+        it('indents the login buttons at 768px', () => {
+            cy.viewport(mdWidth, phoneHeight);
+            cy.get('#home-login-buttons').should('have.css', 'margin-left', loginIndentFromMd);
+        });
+
+        it('drops the login button indent at 767px', () => {
+            cy.viewport(belowMdWidth, phoneHeight);
+            cy.get('#home-login-buttons').should('have.css', 'margin-left', noSideMargin);
+        });
+
+        it('keeps the logo side margins at 768px', () => {
+            cy.viewport(mdWidth, phoneHeight);
+            expectLogoSideMargins(logoSideMargin);
+        });
+
+        it('drops the logo side margins at 767px', () => {
+            cy.viewport(belowMdWidth, phoneHeight);
+            expectLogoSideMargins(noSideMargin);
+        });
+
+        it('indents the description 170px at 768px', () => {
+            cy.viewport(mdWidth, phoneHeight);
+            cy.get('p.td-description').should('have.css', 'margin-left', descriptionIndentFromMd);
+        });
+
+        it('indents the description 20px at 767px', () => {
+            cy.viewport(belowMdWidth, phoneHeight);
+            cy.get('p.td-description').should('have.css', 'margin-left', descriptionIndentBelowMd);
+        });
+    });
+
+    describe('mobile layout on the narrowest phone', () => {
+        it('does not scroll sideways at 320px', () => {
+            cy.viewport(narrowPhoneWidth, narrowPhoneHeight);
+            loadWithConfig({
+                ...allProvidersEnabled,
+                allowedLocales: ['en'],
+                defaultLocale: 'en'
+            });
+
+            expectNoSidewaysScroll();
+        });
+    });
+
+    // de holds the longest unbroken word on the page (22 characters), fi the
+    // next longest (17); en stands in for the short-word case.
+    describe('mobile layout per locale', () => {
+        ['en', 'de', 'fi'].forEach((locale) => {
+            it(`does not scroll sideways in ${locale}`, () => {
+                cy.viewport(phoneWidth, phoneHeight);
+
+                // Every provider enabled, so the login button row is at its widest.
+                // allowedLocales must name the locale: an empty list means "no
+                // restriction", and the resolver then prefers the browser language
+                // over defaultLocale.
+                loadWithConfig({
+                    ...allProvidersEnabled,
+                    allowedLocales: [locale],
+                    defaultLocale: locale
+                });
+
+                cy.get('p.td-description')
+                    .should('contain.text', homepageStrings[locale].description);
+
+                expectNoSidewaysScroll();
+            });
         });
     });
 

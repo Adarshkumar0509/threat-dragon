@@ -12,6 +12,7 @@ import diagramService from '@/service/diagram/diagram.js';
 import stencilService from '@/service/x6/stencil.js';
 import saveDiagram from '@/service/diagram/save.js';
 import tmActions from '@/store/actions/threatmodel.js';
+import analytics, { methodologyForDiagramType } from '@/service/analytics.js';
 
 jest.mock('@/service/diagram/save.js', () => ({
     __esModule: true,
@@ -19,11 +20,17 @@ jest.mock('@/service/diagram/save.js', () => ({
         save: jest.fn()
     }
 }));
+jest.mock('@/service/analytics.js', () => ({
+    startEditing: jest.fn(),
+    finishEditing: jest.fn(),
+    track: jest.fn(),
+    methodologyForDiagramType: jest.fn()
+}));
 
 describe('components/GraphButtons.vue', () => {
     let graphMock, localVue, routerMock, storeMock, threatEditStub, wrapper;
 
-    const mountComponent = (provider = 'github') => {
+    const mountComponent = (provider = 'github', diagramType = 'STRIDE') => {
         storeMock = new Vuex.Store({
             state: {
                 provider: {
@@ -35,6 +42,7 @@ describe('components/GraphButtons.vue', () => {
                 threatmodel: {
                     selectedDiagram: {
                         title: 'foo',
+                        diagramType,
                         cells: []
                     }
                 }
@@ -63,6 +71,10 @@ describe('components/GraphButtons.vue', () => {
 
     beforeEach(() => {
         saveDiagram.save.mockClear();
+        analytics.startEditing.mockClear();
+        analytics.finishEditing.mockClear();
+        analytics.track.mockClear();
+        methodologyForDiagramType.mockReturnValue('STRIDE');
         localVue = createLocalVue();
         localVue.use(BootstrapVue);
         localVue.use(Vuex);
@@ -130,6 +142,27 @@ describe('components/GraphButtons.vue', () => {
         expect(diagramService.edit).toHaveBeenCalled();
     });
 
+    it('starts an editing session', () => {
+        expect(analytics.startEditing).toHaveBeenCalledWith('diagram');
+    });
+
+    it('uses the analytics methodology mapping when its diagram editor opens', () => {
+        wrapper.destroy();
+        methodologyForDiagramType.mockClear();
+        wrapper = mountComponent('github', 'CIA');
+
+        expect(methodologyForDiagramType).toHaveBeenCalledWith('CIA');
+    });
+
+    it('tracks the mapped methodology when its diagram editor opens', () => {
+        wrapper.destroy();
+        analytics.track.mockClear();
+        methodologyForDiagramType.mockReturnValue('CIA');
+        wrapper = mountComponent('github', 'CIA');
+
+        expect(analytics.track).toHaveBeenCalledWith('DIAGRAM_METHODOLOGY_USED', { methodology: 'CIA' });
+    });
+
     it('shows the threat edit modal dialog', () => {
         wrapper.vm.threatSelected('asdf', 'new');
         expect(threatEditStub.methods.editThreat).toHaveBeenCalledWith('asdf', 'new');
@@ -159,5 +192,10 @@ describe('components/GraphButtons.vue', () => {
     it('disposes the graph', () => {
         wrapper.destroy();
         expect(diagramService.dispose).toHaveBeenCalled();
+    });
+
+    it('finishes the editing session when the graph unmounts', () => {
+        wrapper.destroy();
+        expect(analytics.finishEditing).toHaveBeenCalledTimes(1);
     });
 });

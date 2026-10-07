@@ -1,4 +1,8 @@
 describe('editing threat models', () => {
+    beforeEach(() => {
+        cy.launchThreatDragon();
+    });
+
     describe('editing a new model', () => {
         beforeEach(() => {
             cy.get('#local-login-btn').click();
@@ -31,6 +35,14 @@ describe('editing threat models', () => {
 
         it('should have the contributors field', () => {
             cy.get('#contributors').should('be.visible');
+        });
+
+        it('has the release version field', () => {
+            cy.get('#release-version').should('be.visible');
+        });
+
+        it('has the release date field', () => {
+            cy.get('#released-at').should('be.visible');
         });
 
         it('can add a new diagram', () => {

@@ -1,20 +1,81 @@
-import { LOCALE_SELECTED } from '../actions/locale';
+import { localeSelected, resolveLocale as resolveLocaleAction } from '../actions/locale';
+import { isSupportedLocale, resolveLocale, getBrowserLanguages } from '@/service/locale/locale-resolver';
+import i18nFactory, { supportedLocales, defaultLocale } from '@/i18n/index';
 
 const state = {
-    locale: 'en'
+    locale: 'en',
+    userSelectedLocale: false
 };
 
-const actions = {
-    [LOCALE_SELECTED]: ({ commit }, locale) => commit(LOCALE_SELECTED, locale)
-};
+const userSelectedLocale = 'USER_SELECTED_LOCALE';
 
-const mutations = {
-    [LOCALE_SELECTED]: (state, locale) => {
-        state.locale = locale;
+const syncI18nWithServerPolicy = (i18n, rootGetters) => {
+    const serverDefault = rootGetters.defaultLocale;
+
+    if (serverDefault) {
+        i18n.global.fallbackLocale = {
+            ...(i18n.global.fallbackLocale || {}),
+            default: serverDefault
+        };
     }
 };
 
-const getters = { };
+const actions = {
+    [localeSelected]: ({ commit, rootGetters }, locale) => {
+        const available = rootGetters.availableLocales;
+        if (!available || !available.includes(locale)) return;
+        commit(localeSelected, locale);
+        commit(userSelectedLocale, true);
+
+        const i18n = i18nFactory.get();
+        i18n.global.locale = locale;
+        syncI18nWithServerPolicy(i18n, rootGetters);
+    },
+
+    [resolveLocaleAction]: ({ commit, dispatch, rootGetters, state }) => {
+        const hasPersistedUserLocale = state.userSelectedLocale ||
+            (state.userSelectedLocale === undefined && state.locale !== defaultLocale);
+
+        if (hasPersistedUserLocale) {
+            const available = rootGetters.availableLocales;
+            if (available.includes(state.locale)) {
+                dispatch(localeSelected, state.locale);
+                return;
+            }
+        }
+
+        const browserLocales = typeof navigator !== 'undefined' ? getBrowserLanguages(navigator) : [];
+        const { locale } = resolveLocale({
+            browserLanguages: browserLocales,
+            serverDefault: rootGetters.defaultLocale,
+            allowedLocales: rootGetters.allowedLocales
+        });
+
+        dispatch(localeSelected, locale);
+        commit(userSelectedLocale, false);
+    }
+};
+
+const mutations = {
+    [localeSelected]: (state, locale) => {
+        // Safety net: reject non-canonical or non-existent locale formats
+        if (!isSupportedLocale(locale)) return;
+        state.locale = locale;
+    },
+    [userSelectedLocale]: (state, userSelectedLocale) => {
+        state.userSelectedLocale = userSelectedLocale;
+    }
+};
+
+const getters = {
+    availableLocales: (state, getters, rootState, rootGetters) => {
+        const allowed = rootGetters?.allowedLocales;
+        if (allowed && Array.isArray(allowed) && allowed.length > 0) {
+            return supportedLocales.filter(l => allowed.includes(l));
+        }
+        return supportedLocales;
+    }
+};
 
 export default {
     state,

@@ -30,11 +30,12 @@ import { mapState } from 'vuex';
 import { getProviderType } from '@/service/provider/providers.js';
 import { providerTypes } from '@/service/provider/providerTypes.js';
 import demo from '@/service/demo/index.js';
-import isElectron from 'is-electron';
 import TdHero from '@/components/Hero.vue';
 import tmActions from '@/store/actions/threatmodel.js';
 import schema from '@/service/schema/ajv';
-import tmBom from '@/service/migration/tmBom/tmBom';
+import { importOtm } from '@/service/migration/otm/otm';
+import { importTmbom } from '@/service/migration/tmBom/tmBom';
+import analytics from '@/service/analytics.js';
 
 export default {
     name: 'SelectDemoModel',
@@ -56,33 +57,34 @@ export default {
     },
     methods: {
         onModelClick(model) {
+            analytics.track('THREAT_MODEL_OPENED', {
+                source: 'demo',
+                provider: this.selectedProvider
+            });
             if (schema.isTmBom(model.model)) {
-                this.$store.dispatch(tmActions.selected, tmBom.read(model.model));
+                this.$store.dispatch(tmActions.selected, importTmbom(model.model));
+            } else if (schema.isOtm(model.model)) {
+                this.$store.dispatch(tmActions.selected, importOtm(model.model));
             } else {
                 this.$store.dispatch(tmActions.selected, model.model);
             }
-            if (isElectron()) {
-                // tell any electron server that the model has changed
+            if (this.providerType === providerTypes.desktop) {
                 window.electronAPI.modelOpened(model.name);
                 const params = Object.assign({}, this.$route.params, { threatmodel: model.name });
                 this.$router.push({ name: 'desktopThreatModel', params });
-                return;
-            }
-            if (this.providerType === providerTypes.local) {
+            } else if (this.providerType === providerTypes.local) {
                 const params = Object.assign({}, this.$route.params, { threatmodel: model.name });
-                this.$router.push({ name: 'localThreatModel', params });}
-
-            else{
+                this.$router.push({ name: 'localThreatModel', params });
+            } else {
                 // Git providers: Navigate through repo/branch selection (same flow as creating new model)
                 // Google Drive: Navigate through folder selection (same flow as creating new model)
                 // Model data is already stored in state via tmActions.selected above
                 this.$store.dispatch(tmActions.stash);
-
                 this.$router.push({
                     name: this.providerType === providerTypes.git ? `${this.providerType}Repository` : `${this.providerType}Folder`,
                     params: { provider: this.selectedProvider },
-                    query: { action: 'create' }});
-
+                    query: { action: 'create' }
+                });
             }
         }
     }

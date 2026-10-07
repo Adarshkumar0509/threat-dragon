@@ -3,6 +3,7 @@ import { shallowMount } from '@vue/test-utils';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
 import { createLocalVue, mountOptions } from '../helpers/vueTestUtils';
+import TdBadge from '@/components/Badge.vue';
 import TdGraphThreats from '@/components/GraphThreats.vue';
 
 describe('components/GraphThreats.vue', () => {
@@ -85,6 +86,34 @@ describe('components/GraphThreats.vue', () => {
             expect(wrapper.find('.threat-icon.gray-icon').exists()).toEqual(true);
         });
 
+        it('displays a green check for accepted', () => {
+            const propsData = getDefaultPropsData();
+            propsData.status = 'Accepted';
+            wrapper = getWrapper(propsData);
+            expect(wrapper.find('.threat-icon.green-icon').exists()).toEqual(true);
+        });
+
+        it('displays a green check for transferred', () => {
+            const propsData = getDefaultPropsData();
+            propsData.status = 'Transferred';
+            wrapper = getWrapper(propsData);
+            expect(wrapper.find('.threat-icon.green-icon').exists()).toEqual(true);
+        });
+
+        it('displays a green check for avoided', () => {
+            const propsData = getDefaultPropsData();
+            propsData.status = 'Avoided';
+            wrapper = getWrapper(propsData);
+            expect(wrapper.find('.threat-icon.green-icon').exists()).toEqual(true);
+        });
+
+        it('displays a green check for eliminated', () => {
+            const propsData = getDefaultPropsData();
+            propsData.status = 'Eliminated';
+            wrapper = getWrapper(propsData);
+            expect(wrapper.find('.threat-icon.green-icon').exists()).toEqual(true);
+        });
+
         it('displays a darkred circle for critical severity', () => {
             const propsData = getDefaultPropsData();
             propsData.severity = 'Critical';
@@ -137,7 +166,7 @@ describe('components/GraphThreats.vue', () => {
         });
 
         it('displays the model type', () => {
-            expect(wrapper.find('.threat-card').text()).toContain('CIA');
+            expect(wrapper.findComponent(TdBadge).text()).toBe('CIA');
         });
     });
 

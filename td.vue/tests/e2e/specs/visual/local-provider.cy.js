@@ -21,7 +21,23 @@ const openNewModel = () => {
 
 describe('visual regression - local provider routes', () => {
     it('captures the public home route', () => {
+        cy.intercept('GET', '/api/config', {
+            statusCode: 200,
+            body: {
+                status: 200,
+                data: {
+                    githubEnabled: true,
+                    bitbucketEnabled: false,
+                    gitlabEnabled: false,
+                    googleEnabled: false,
+                    localEnabled: true,
+                    allowedLocales: [],
+                    defaultLocale: 'en'
+                }
+            }
+        }).as('getConfig');
         cy.visit('/');
+        cy.wait('@getConfig');
         cy.get('#local-login-btn');
         cy.matchVisualSnapshot('home');
     });
@@ -53,14 +69,6 @@ describe('visual regression - local provider routes', () => {
         cy.matchVisualSnapshot('local-new-threat-model-edit');
     });
 
-    it('captures the template gallery route', () => {
-        loginLocal();
-        cy.visit('/#/local/templates');
-        cy.url().should('contain', '/local/templates');
-        cy.get('#nav-sign-out');
-        cy.matchVisualSnapshot('local-template-gallery');
-    });
-
     it('captures the demo threat model view route with a sample diagram', () => {
         openDemoModel();
         cy.get('#td-report-btn');
@@ -89,14 +97,5 @@ describe('visual regression - local provider routes', () => {
         cy.url().should('contain', '/report');
         cy.get('#td-return-btn');
         cy.matchVisualSnapshot('local-demo-report');
-    });
-
-    it('captures the export template route', () => {
-        openDemoModel();
-        cy.get('#manage-model-btn').click();
-        cy.get('#export-template-option').click();
-        cy.url().should('contain', '/local/export-template');
-        cy.get('#name').should('have.value', 'Demo Threat Model');
-        cy.matchVisualSnapshot('local-export-template');
     });
 });

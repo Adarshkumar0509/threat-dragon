@@ -2,63 +2,70 @@
     <b-row>
         <b-col md="6">
             <b-card :header="`${$t('threatmodel.properties.title')}`">
-                <b-card-body>
-                    <td-graph-properties />
-                </b-card-body>
+                <td-graph-properties />
             </b-card>
         </b-col>
         <b-col md="6">
             <b-card header-tag="header">
                 <template #header>
-                    {{ $t('threatmodel.threats') }}
-                    <b-btn
-                        :disabled="disableNewThreat"
-                        @click="newThreat()"
-                        v-if="!!cellRef"
-                        variant="primary"
-                        size="sm"
-                        class="float-right"
-                    >
-                        <font-awesome-icon icon="plus" class="mr-1"></font-awesome-icon>
-                        {{ $t('threats.newThreat') }}
-                    </b-btn>
+                    <div class="threats-header">
+                        <span>{{ $t('threatmodel.threats') }}</span>
+                        <button
+                            v-if="!disableNewThreat"
+                            type="button"
+                            class="threats-header-action"
+                            @click="newThreat()"
+                        >
+                            <font-awesome-icon icon="plus" class="threats-header-icon"></font-awesome-icon>
+                            {{ $t('threats.newThreat') }}
+                        </button>
+                    </div>
                 </template>
-                <b-card-body>
-                    <b-card-text v-if="!!cellRef">
-                        <b-row>
-                            <b-col
-                                md="4"
-                                v-for="(threat, idx) in threats || []"
-                                :key="idx"
-                            >
-                                <td-graph-threats
-                                    :threat="threat"
-                                    @threatSelected="threatSelected"
-                                />
-                            </b-col>
-                        </b-row>
-                    </b-card-text>
-                    <b-card-text
-                        v-if="!cellRef || !cellRef.data">
-                        {{ $t('threats.emptyThreat') }}
-                    </b-card-text>
-                </b-card-body>
+                <b-card-text v-if="!!cellRef">
+                    <b-row>
+                        <b-col
+                            md="4"
+                            v-for="(threat, idx) in threats || []"
+                            :key="idx"
+                        >
+                            <td-graph-threats
+                                :threat="threat"
+                                @threatSelected="threatSelected"
+                            />
+                        </b-col>
+                    </b-row>
+                </b-card-text>
+                <b-card-text
+                    v-if="!cellRef || !cellRef.data">
+                    {{ $t('threats.emptyThreat') }}
+                </b-card-text>
             </b-card>
+
+            <hr v-if="!disableNewThreat" />
+
+            <a href="#"
+                v-if="!disableNewThreat"
+                @click.prevent="newThreat()"
+                class="new-threat-by-type m-2"
+            >
+                <font-awesome-icon icon="plus"></font-awesome-icon>
+                {{ $t('threats.newThreat') }}
+            </a>
             <a href="#"
                 v-if="!disableNewThreat && diagram.diagramType !== 'EOP'"
                 @click.prevent="AddThreatByType()"
                 class="new-threat-by-type m-2"
             >
-                    <font-awesome-icon icon="plus"></font-awesome-icon>
-                    {{ $t('threats.newThreatByType') }}
+                <font-awesome-icon icon="plus"></font-awesome-icon>
+                {{ $t('threats.newThreatByType') }}
             </a>
             <a href="#"
                 v-if="!disableNewThreat && diagram.diagramType !== 'EOP'"
                 @click.prevent="AddThreatByContext()"
                 class="new-threat-by-type m-2"
             >
-                    <font-awesome-icon icon="plus"></font-awesome-icon>
-                    {{ $t('threats.newThreatByContext') }}
+                <font-awesome-icon icon="plus"></font-awesome-icon>
+                {{ $t('threats.newThreatByContext') }}
             </a>
         </b-col>
     </b-row>
@@ -69,6 +76,35 @@
     color: $orange;
     font-size: 16px;
     padding: 15px;
+}
+.threats-header {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    line-height: 1.5;
+}
+.threats-header-action {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: $orange;
+    display: inline-flex;
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: inherit;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+    white-space: nowrap;
+}
+.threats-header-icon {
+    margin-right: 0.25rem;
+}
+.threats-header-action:hover,
+.threats-header-action:focus {
+    color: darken($orange, 10%);
+    text-decoration: underline;
 }
 .props-header {
     a {
@@ -91,11 +127,12 @@
 import { mapState } from 'vuex';
 
 import { createNewTypedThreat } from '@/service/threats/index.js';
-import { CELL_DATA_UPDATED, CELL_UNSELECTED } from '@/store/actions/cell.js';
+import { cellDataUpdated, cellUnselected } from '@/store/actions/cell.js';
 import dataChanged from '@/service/x6/graph/data-changed.js';
 import tmActions from '@/store/actions/threatmodel.js';
 import TdGraphProperties from '@/components/GraphProperties.vue';
 import TdGraphThreats from '@/components/GraphThreats.vue';
+import analytics from '@/service/analytics.js';
 
 export default {
     name: 'TdGraphMeta',
@@ -120,7 +157,7 @@ export default {
     },
     methods: {
         init() {
-            this.$store.dispatch(CELL_UNSELECTED);
+            this.$store.dispatch(cellUnselected);
         },
         threatSelected(threatId, state) {
             console.debug('selected threat ID: ' + threatId);
@@ -133,15 +170,18 @@ export default {
             this.cellRef.data.hasOpenThreats = this.cellRef.data.threats.length > 0;
             this.$store.dispatch(tmActions.update, { threatTop: this.threatTop+1 });
             this.$store.dispatch(tmActions.modified);
-            this.$store.dispatch(CELL_DATA_UPDATED, this.cellRef.data);
+            this.$store.dispatch(cellDataUpdated, this.cellRef.data);
             dataChanged.updateStyleAttrs(this.cellRef);
             this.threatSelected(threat.id, 'new');
+            analytics.track('THREAT_CREATED_MANUALLY', { status: threat.status });
         },
         AddThreatByType(){
             this.$emit('threatSuggest', 'type');
+            analytics.track('THREAT_SUGGESTIONS_REQUESTED', { source: 'type' });
         },
         AddThreatByContext(){
             this.$emit('threatSuggest', 'context');
+            analytics.track('THREAT_SUGGESTIONS_REQUESTED', { source: 'context' });
         }
     },
 };

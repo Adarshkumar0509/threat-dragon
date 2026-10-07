@@ -51,17 +51,16 @@
                         :text="$t('forms.edit')" />
                     <td-form-button id="td-report-btn" :onBtnClick="onReportClick" icon="file-alt"
                         :text="$t('forms.report')" />
-                    <!-- REPLACE the export template button with dropdown -->
-                    <td-dropdown right variant="secondary" :text="$t('forms.manage')" id="manage-model-btn" v-if="enableTemplates">
+                    <td-dropdown right variant="secondary" :text="$t('forms.export')" id="manage-model-btn" v-if="enableExport">
                         <template #default="{ close }">
-                            <button
+                            <button v-if="enableExport"
                                 type="button"
                                 class="td-dropdown-item"
-                                @click="(evt) => { onExportTemplateClick(evt); close(); }"
-                                id="export-template-option"
+                                @click="(evt) => { onExportTmBomClick(evt); close(); }"
+                                id="export-tmbom-option"
                             >
                                 <font-awesome-icon icon="file-import" ></font-awesome-icon>
-                                {{ $t('forms.exportTemplate') }}
+                                {{ $t('forms.exportTmBom') }}
                             </button>
                         </template>
                     </td-dropdown>
@@ -99,14 +98,22 @@
 import { mapState } from 'vuex';
 
 import { getProviderType } from '@/service/provider/providers.js';
+import { writeFile } from '@/service/save.js';
 import TdDropdown from '@/components/Dropdown.vue';
 import TdFormButton from '@/components/FormButton.vue';
 import TdImage from '@/components/Image.vue';
 import TdThreatModelSummaryCard from '@/components/ThreatModelSummaryCard.vue';
 import tmActions from '@/store/actions/threatmodel.js';
+import analytics from '@/service/analytics.js';
 
 export default {
     name: 'ThreatModel',
+    props: {
+        enableExport: {
+            type: Boolean,
+            default: false
+        }
+    },
     components: {
         TdDropdown,
         TdFormButton,
@@ -114,7 +121,6 @@ export default {
         TdThreatModelSummaryCard
     },
     computed: mapState({
-        enableTemplates: (state) => ['github', 'local'].includes(state.provider.selected),
         model: (state) => state.threatmodel.data,
         providerType: (state) => getProviderType(state.provider.selected),
         version: (state) => state.packageBuildVersion
@@ -133,14 +139,12 @@ export default {
             this.$store.dispatch(tmActions.clear);
             this.$router.push('/dashboard');
         },
-        onExportTemplateClick(evt) {
+        async onExportTmBomClick(evt) {
             evt.preventDefault();
-            // Demo models live on the local route; use the matching export route to avoid missing params
-            const isLocalRoute = this.$route.name && this.$route.name.startsWith('local');
-            const routeName = isLocalRoute
-                ? 'localThreatModelExportTemplate'
-                : `${this.providerType}ThreatModelExportTemplate`;
-            this.$router.push({ name: routeName, params: this.$route.params });
+            const tmBom = this.$store.getters.tmBomExport;
+            console.debug('Export to TM-BOM ' + JSON.stringify(tmBom, null, 2));
+            await writeFile(tmBom, '');
+            analytics.track('THREAT_MODEL_TMBOM_EXPORTED', { format: 'TM_BOM' });
         },
         getThumbnailUrl(diagram) {
             if (!diagram || !diagram.diagramType) {
@@ -159,7 +163,6 @@ export default {
         const threatTop = this.model.detail.threatTop === undefined ? 100 : this.model.detail.threatTop;
         const diagramTop = this.model.detail.diagramTop === undefined ? 10 : this.model.detail.diagramTop;
         const update = { diagramTop: diagramTop, version: this.version, threatTop: threatTop };
-        console.debug('updates: ' + JSON.stringify(update));
         this.$store.dispatch(tmActions.update, update);
         // if a diagram has just been closed, the history insists on marking the model as modified
         this.$store.dispatch(tmActions.notModified);

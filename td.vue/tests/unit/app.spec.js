@@ -1,13 +1,16 @@
-import { BootstrapVue } from 'bootstrap-vue';
 import { shallowMount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 
 import { createLocalVue, mountOptions } from './helpers/vueTestUtils';
 import App from '@/App.vue';
 import i18nFactory from '@/i18n/index.js';
-import { LOADER_FINISHED } from '@/store/actions/loader.js';
+import { loaderFinished } from '@/store/actions/loader.js';
 import Navbar from '@/components/Navbar.vue';
 import TdOverlay from '@/components/Overlay.vue';
+
+jest.mock('@/service/environment', () => ({
+    isDesktopApp: () => false
+}));
 
 describe('App.vue', () => {
     let wrapper, localVue, mockStore;
@@ -15,7 +18,6 @@ describe('App.vue', () => {
     beforeEach(() => {
         console.log = jest.fn();
         localVue = createLocalVue();
-        localVue.use(BootstrapVue);
         mockStore = createStore({
             state: {
                 loader: {
@@ -23,7 +25,7 @@ describe('App.vue', () => {
                 }
             },
             actions: {
-                [LOADER_FINISHED]: () => {}
+                [loaderFinished]: () => {}
             }
         });
         wrapper = shallowMount(App, mountOptions(localVue, {

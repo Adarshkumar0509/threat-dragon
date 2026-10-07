@@ -56,14 +56,16 @@
 <script>
 import { mapState } from 'vuex';
 
-import isElectron from 'is-electron';
 import { getProviderType } from '@/service/provider/providers.js';
+import { providerTypes } from '@/service/provider/providerTypes';
 import TdFormButton from '@/components/FormButton.vue';
 import TdHero from '@/components/Hero.vue';
 import tmActions from '@/store/actions/threatmodel.js';
 import schema from '@/service/schema/ajv';
+import { importOtm } from '@/service/migration/otm/otm';
 import { importTmbom } from '@/service/migration/tmBom/tmBom';
 import threatDragonV1 from '@/service/migration/tdV1/threatDragonV1';
+import analytics from '@/service/analytics.js';
 
 // only search for text files
 const pickerFileOptions = {
@@ -86,7 +88,8 @@ export default {
     },
     computed: {
         ...mapState({
-            providerType: (state) => getProviderType(state.provider.selected)
+            providerType: (state) => getProviderType(state.provider.selected),
+            selectedProvider: (state) => state.provider.selected
         }),
         prompt() { return '{ ' + this.$t('threatmodel.dragAndDrop') + this.$t('threatmodel.jsonPaste') + ' ... }'; }
     },
@@ -162,17 +165,20 @@ export default {
                     this.$store.dispatch(tmActions.update, { fileName: fileName });
                 } else if (schema.isTmBom(jsonModel)) {
                     console.info('Convert TM-BOM to internal TD format');
-                    this.$toast.warning(this.$t('threatmodel.warnings.tmUnsupported'), { timeout: false });
+                    this.$toast.warning(this.$t('threatmodel.warnings.tmBomImported'), { timeout: false });
                     jsonModel = importTmbom(jsonModel);
                     console.debug('Force selection of file name for TM-BOM');
                     fileName = '';
                     this.$store.dispatch(tmActions.update, { fileName: fileName });
                 } else if (schema.isOtm(jsonModel)) {
-                    console.error('Convert OTM to internal TD format not yet supported');
-                    this.$toast.error(this.$t('threatmodel.warnings.otmUnsupported'), { timeout: false });
-                    return;
+                    console.info('Convert OTM to internal TD format');
+                    this.$toast.warning(this.$t('threatmodel.warnings.otmImported'), { timeout: false });
+                    jsonModel = importOtm(jsonModel);
+                    console.debug('Force selection of file name for OTM');
+                    fileName = '';
+                    this.$store.dispatch(tmActions.update, { fileName: fileName });
                 } else {
-                    console.warn('Model does not strictly match schema: ' + JSON.stringify(schema.checkV2(jsonModel, null, 2)));
+                    console.warn('Model does not strictly match schema: ' + JSON.stringify(schema.checkOtm(jsonModel, null, 2)));
                     this.$toast.warning(this.$t('threatmodel.warnings.jsonSchema'));
                 }
             }
@@ -180,13 +186,13 @@ export default {
             // save the threat model in the store
             this.$store.dispatch(tmActions.selected, jsonModel);
 
-            if (isElectron()) {
+            if (this.providerType === providerTypes.desktop) {
                 // tell the desktop server that the model has changed
                 window.electronAPI.modelOpened(fileName);
             }
 
             let params;
-            // this will deliberately fail if the threat model does not have a title in the summary
+            // fails if threat model does not contain 'summary.title'
             try {
                 params = Object.assign({}, this.$route.params, {
                     threatmodel: jsonModel.summary.title
@@ -197,6 +203,10 @@ export default {
                 return;
             }
 
+            analytics.track('THREAT_MODEL_OPENED', {
+                source: 'import',
+                provider: this.selectedProvider
+            });
             this.$router.push({ name: `${this.providerType}ThreatModel`, params });
         }
     }

@@ -5,9 +5,16 @@ import Vuex from 'vuex';
 
 import TdGraphMeta from '@/components/GraphMeta.vue';
 import TdGraphThreats from '@/components/GraphThreats.vue';
+import analytics from '@/service/analytics.js';
+
+jest.mock('@/service/analytics.js', () => ({
+    track: jest.fn()
+}));
 
 describe('components/GraphMeta.vue', () => {
     let wrapper;
+
+    beforeEach(() => analytics.track.mockClear());
 
     describe('emptyState', () => {
         beforeEach(() => {
@@ -34,6 +41,10 @@ describe('components/GraphMeta.vue', () => {
 
         it('displays the empty threat message', () => {
             expect(wrapper.findComponent(BCardText).text()).toContain('threats.emptyThreat');
+        });
+
+        it('hides the header new threat action', () => {
+            expect(wrapper.find('.threats-header-action').exists()).toEqual(false);
         });
     });
 
@@ -87,6 +98,10 @@ describe('components/GraphMeta.vue', () => {
 
         it('displays the threat card', () => {
             expect(wrapper.findComponent(TdGraphThreats).exists()).toEqual(true);
+        });
+
+        it('displays the header new threat action', () => {
+            expect(wrapper.find('.threats-header-action').exists()).toEqual(true);
         });
     });
 
@@ -186,7 +201,7 @@ describe('components/GraphMeta.vue', () => {
                         }
                     }
                 },
-                actions:{ THREATMODEL_UPDATE: () => {}},
+                actions:{ threatmodelUpdate: () => {}},
             });
             wrapper = shallowMount(TdGraphMeta, {
                 localVue,
@@ -202,6 +217,22 @@ describe('components/GraphMeta.vue', () => {
 
         it('adds a threat to the cell data', () => {
             expect(wrapper.vm.threatSelected).toHaveBeenCalledWith(expect.anything(), 'new');
+        });
+
+        it('tracks manual threat creation', () => {
+            expect(analytics.track).toHaveBeenCalledWith('THREAT_CREATED_MANUALLY', { status: 'Open' });
+        });
+    });
+
+    describe('threat suggestions', () => {
+        it('tracks requests from the threat type engine', () => {
+            TdGraphMeta.methods.AddThreatByType.call({ $emit: jest.fn() });
+            expect(analytics.track).toHaveBeenCalledWith('THREAT_SUGGESTIONS_REQUESTED', { source: 'type' });
+        });
+
+        it('tracks requests from the context engine', () => {
+            TdGraphMeta.methods.AddThreatByContext.call({ $emit: jest.fn() });
+            expect(analytics.track).toHaveBeenCalledWith('THREAT_SUGGESTIONS_REQUESTED', { source: 'context' });
         });
     });
 

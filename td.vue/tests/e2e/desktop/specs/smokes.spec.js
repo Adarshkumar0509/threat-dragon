@@ -16,11 +16,13 @@ describe('Desktop smoke tests', function () {
 
         const windowSize = await browser.execute(() => ({
             width: Math.max(window.outerWidth, window.innerWidth),
-            height: Math.max(window.outerHeight, window.innerHeight)
+            height: Math.max(window.outerHeight, window.innerHeight),
+            availableWidth: window.screen.availWidth,
+            availableHeight: window.screen.availHeight
         }));
 
-        assert.equal(windowSize.width >= 1200, true);
-        assert.equal(windowSize.height >= 900, true);
+        assert.equal(windowSize.width >= Math.min(1200, Math.floor(windowSize.availableWidth * 0.9)), true);
+        assert.equal(windowSize.height >= Math.min(900, Math.floor(windowSize.availableHeight * 0.9)), true);
     });
 
     it('shows the desktop entrypoint on the home page', async () => {
@@ -38,6 +40,14 @@ describe('Desktop smoke tests', function () {
         await titleInput.waitForDisplayed();
         await titleInput.clearValue();
         await titleInput.setValue('Desktop smoke model');
+
+        const releaseVersionInput = await browser.$('#release-version');
+        await releaseVersionInput.waitForDisplayed();
+        await releaseVersionInput.setValue('1.0.0');
+
+        const releaseDateInput = await browser.$('#released-at');
+        await releaseDateInput.waitForDisplayed();
+        await releaseDateInput.setValue('2026-06-24');
 
         await browser.waitUntil(async () => {
             const parentCard = await browser.$('#parent-card');

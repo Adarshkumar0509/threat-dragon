@@ -3,8 +3,18 @@ import { createLocalVue, mount } from '@vue/test-utils';
 import Vuex from 'vuex';
 
 import ThreatModelEdit from '@/views/ThreatModelEdit.vue';
+import TdDropdown from '@/components/Dropdown.vue';
 import TdFormTags from '@/components/FormTags.vue';
-import { THREATMODEL_CONTRIBUTORS_UPDATED, THREATMODEL_RESTORE, THREATMODEL_NOT_MODIFIED, } from '@/store/actions/threatmodel.js';
+import TdInputGroup from '@/components/InputGroup.vue';
+import { threatmodelContributorsUpdated, threatmodelRestore, threatmodelNotModified, } from '@/store/actions/threatmodel.js';
+import analytics from '@/service/analytics.js';
+
+jest.mock('@/service/analytics.js', () => ({
+    startEditing: jest.fn(),
+    finishEditing: jest.fn(),
+    track: jest.fn(),
+    methodologyForDiagramType: jest.fn((diagramType) => diagramType)
+}));
 
 describe('views/ThreatmodelEdit.vue', () => {
     const contributors = ['foo', 'bar' ];
@@ -21,6 +31,8 @@ describe('views/ThreatmodelEdit.vue', () => {
     let wrapper, localVue, mockRouter, mockStore, modelChanged;
 
     beforeEach(() => {
+        jest.clearAllMocks();
+        analytics.methodologyForDiagramType.mockImplementation((diagramType) => diagramType);
         console.log = jest.fn();
         modelChanged = false;
         localVue = createLocalVue();
@@ -39,14 +51,15 @@ describe('views/ThreatmodelEdit.vue', () => {
                         detail: {
                             contributors: contributors.map(x => ({ name: x })),
                             diagrams,
+                            diagramTop: 2,
                             reviewer
                         }
                     }
                 }
             },
             actions: {
-                [THREATMODEL_CONTRIBUTORS_UPDATED]: () => { },
-                [THREATMODEL_RESTORE]: () => {}
+                [threatmodelContributorsUpdated]: () => { },
+                [threatmodelRestore]: () => {}
             },
             getters: {
                 modelChanged: () => modelChanged
@@ -55,6 +68,7 @@ describe('views/ThreatmodelEdit.vue', () => {
 
         mockRouter = {
             push: jest.fn(),
+            replace: jest.fn(),
             path
         };
 
@@ -68,9 +82,13 @@ describe('views/ThreatmodelEdit.vue', () => {
                 $t: key => key,
                 $route: mockRouter,
                 $router: mockRouter,
-                $toast: { info: jest.fn() }
+                $toast: { error: jest.fn(), info: jest.fn() }
             }
         });
+    });
+
+    it('starts an editing session', () => {
+        expect(analytics.startEditing).toHaveBeenCalledWith('threat_model');
     });
 
     describe('layout', () => {
@@ -102,6 +120,52 @@ describe('views/ThreatmodelEdit.vue', () => {
         it('displays all diagrams', () => {
             expect(wrapper.findAll('.td-diagram')).toHaveLength(diagrams.length);
         });
+
+        it('uses input groups for diagram rows', () => {
+            expect(wrapper.findAllComponents(TdInputGroup)).toHaveLength(diagrams.length);
+        });
+
+        it('has a release version input', () => {
+            expect(wrapper.find('#release-version').exists()).toEqual(true);
+        });
+
+        it('has a release date input', () => {
+            expect(wrapper.find('#released-at').exists()).toEqual(true);
+        });
+
+        it('selects each diagram type from the dropdown', async () => {
+            const dropdown = wrapper.findComponent(TdDropdown);
+            const types = ['CIA', 'CIADIE', 'LINDDUN', 'PLOT4ai', 'STRIDE', 'EOP', 'Generic'];
+
+            for (const index of types.keys()) {
+                await dropdown.find('.td-dropdown-toggle').trigger('click');
+                await dropdown.findAll('.td-dropdown-item').at(index).trigger('click');
+            }
+
+            expect(wrapper.vm.model.detail.diagrams[0].diagramType).toEqual('threatmodel.diagram.generic.select');
+        });
+
+        it('marks the model modified when form fields change', async () => {
+            mockStore.dispatch = jest.fn();
+            const inputs = [
+                wrapper.find('#title'),
+                wrapper.find('#owner'),
+                wrapper.find('#reviewer'),
+                wrapper.find('#release-version'),
+                wrapper.find('#released-at'),
+                wrapper.find('#description'),
+                wrapper.find('.td-diagram'),
+                wrapper.find('.td-diagram-description')
+            ];
+
+            for (const input of inputs) {
+                await input.setValue('changed');
+            }
+            await wrapper.findComponent(TdFormTags).vm.$emit('input', ['changed']);
+
+            expect(mockStore.dispatch).toHaveBeenCalledWith('THREATMODEL_MODIFIED');
+        });
+
     });
 
     describe('form actions', () => {
@@ -140,7 +204,7 @@ describe('views/ThreatmodelEdit.vue', () => {
                 });
 
                 it('dispatches the restore action', () => {
-                    expect(mockStore.dispatch).toHaveBeenCalledWith(THREATMODEL_RESTORE);
+                    expect(mockStore.dispatch).toHaveBeenCalledWith(threatmodelRestore);
                 });
             });
 
@@ -156,11 +220,11 @@ describe('views/ThreatmodelEdit.vue', () => {
                     });
 
                     it('dispatches the restore action', () => {
-                        expect(mockStore.dispatch).toHaveBeenCalledWith(THREATMODEL_RESTORE);
+                        expect(mockStore.dispatch).toHaveBeenCalledWith(threatmodelRestore);
                     });
 
                     it('dispatches the not-modified action', () => {
-                        expect(mockStore.dispatch).toHaveBeenCalledWith(THREATMODEL_NOT_MODIFIED);
+                        expect(mockStore.dispatch).toHaveBeenCalledWith(threatmodelNotModified);
                     });
                 });
 
@@ -199,6 +263,7 @@ describe('views/ThreatmodelEdit.vue', () => {
                         params: mockRouter.params
                     });
                 });
+
             });
 
 
@@ -235,6 +300,69 @@ describe('views/ThreatmodelEdit.vue', () => {
             it('adds a new diagram', () => {
                 expect(mockStore.state.threatmodel.data.detail.diagrams).toHaveLength(diagramCount + 1);
             });
+
+            it('does not track diagram creation before the model is saved', () => {
+                expect(analytics.track).not.toHaveBeenCalled();
+            });
+        });
+
+        it('tracks a created diagram with its selected methodology after a successful save', async () => {
+            mockStore.state.threatmodel.data.detail.diagramTop = 3;
+            const diagramIndex = wrapper.vm.model.detail.diagrams.length;
+            wrapper.vm.onAddDiagramClick();
+            wrapper.vm.onDiagramTypeClick(diagramIndex, 'CIA');
+            const dispatch = mockStore.dispatch;
+            mockStore.dispatch = jest.fn().mockResolvedValue(true);
+            analytics.track.mockClear();
+
+            await wrapper.vm.onSaveClick({ preventDefault: jest.fn() });
+
+            expect(analytics.track).toHaveBeenCalledWith('DIAGRAM_CREATED', { methodology: 'CIA' });
+            mockStore.dispatch = dispatch;
+        });
+
+        it('does not track a created diagram when saving fails', async () => {
+            wrapper.vm.onAddDiagramClick();
+            const dispatch = mockStore.dispatch;
+            mockStore.dispatch = jest.fn();
+            modelChanged = true;
+            analytics.track.mockClear();
+
+            await wrapper.vm.onSaveClick({ preventDefault: jest.fn() });
+
+            expect(analytics.track).not.toHaveBeenCalled();
+            mockStore.dispatch = dispatch;
+        });
+
+        it('does not save a model without a title', async () => {
+            wrapper.vm.model.summary.title = ' ';
+            mockStore.dispatch = jest.fn();
+
+            await wrapper.vm.onSaveClick({ preventDefault: jest.fn() });
+
+            expect(wrapper.vm.$toast.error).toHaveBeenCalledWith('Threat model must have a title');
+        });
+
+        it('tracks created diagrams after creating a model', async () => {
+            mockRouter.name = 'gitThreatModelCreate';
+            wrapper.vm.onAddDiagramClick();
+            mockStore.dispatch = jest.fn().mockResolvedValue(true);
+            analytics.track.mockClear();
+
+            await wrapper.vm.onSaveClick({ preventDefault: jest.fn() });
+
+            expect(analytics.track).toHaveBeenCalledWith('DIAGRAM_CREATED', { methodology: 'STRIDE' });
+        });
+
+        it('does not track created diagrams when model creation fails', async () => {
+            mockRouter.name = 'gitThreatModelCreate';
+            wrapper.vm.onAddDiagramClick();
+            mockStore.dispatch = jest.fn().mockResolvedValue(false);
+            analytics.track.mockClear();
+
+            await wrapper.vm.onSaveClick({ preventDefault: jest.fn() });
+
+            expect(analytics.track).not.toHaveBeenCalled();
         });
 
         describe('duplicate diagram', () => {
@@ -303,17 +431,67 @@ describe('views/ThreatmodelEdit.vue', () => {
 
         describe('contributors setter', () => {
             const newContribs = [ '1a', '2b', '3c' ];
-            beforeEach(() => {
+            beforeEach(async () => {
                 mockStore.dispatch = jest.fn();
-                wrapper.setData({ contributors: newContribs });
+                wrapper.vm.contributors = newContribs;
+                await wrapper.vm.$nextTick();
             });
 
             it('dispatches the contributors updated event', () => {
                 expect(mockStore.dispatch).toHaveBeenCalledWith(
-                    THREATMODEL_CONTRIBUTORS_UPDATED,
+                    threatmodelContributorsUpdated,
                     newContribs
                 );
             });
         });
+
+        it('does not track a diagram that was removed before saving', () => {
+            wrapper.vm.createdDiagramIds = [999];
+
+            wrapper.vm.trackCreatedDiagrams();
+
+            expect(analytics.track).not.toHaveBeenCalled();
+        });
+
+        it('marks the model as modified after model metadata changes', () => {
+            mockStore.dispatch = jest.fn();
+
+            wrapper.vm.onModifyModel();
+
+            expect(mockStore.dispatch).toHaveBeenCalledWith('THREATMODEL_MODIFIED');
+        });
+
+        it.each([
+            ['CIA', 'threatmodel.diagram.stride.defaultTitle', 'CIA', 'threatmodel.diagram.cia.defaultTitle'],
+            ['DIE', 'threatmodel.diagram.cia.defaultTitle', 'DIE', 'threatmodel.diagram.die.defaultTitle'],
+            ['CIADIE', 'threatmodel.diagram.die.defaultTitle', 'CIADIE', 'threatmodel.diagram.die.defaultTitle'],
+            ['LINDDUN', 'threatmodel.diagram.die.defaultTitle', 'LINDDUN', 'threatmodel.diagram.linddun.defaultTitle'],
+            ['PLOT4ai', 'threatmodel.diagram.linddun.defaultTitle', 'PLOT4ai', 'threatmodel.diagram.plot4ai.defaultTitle'],
+            ['STRIDE', 'threatmodel.diagram.plot4ai.defaultTitle', 'STRIDE', 'threatmodel.diagram.stride.defaultTitle'],
+            ['EOP', 'threatmodel.diagram.stride.defaultTitle', 'EOP', 'threatmodel.diagram.eop.defaultTitle'],
+            ['unknown', 'threatmodel.diagram.eop.defaultTitle', 'threatmodel.diagram.generic.select', 'threatmodel.diagram.generic.defaultTitle']
+        ])('updates a default diagram title when changing to %s', (type, currentTitle, expectedType, expectedTitle) => {
+            const diagram = wrapper.vm.model.detail.diagrams[0];
+            diagram.title = currentTitle;
+
+            wrapper.vm.onDiagramTypeClick(0, type);
+
+            expect(diagram).toMatchObject({ diagramType: expectedType, title: expectedTitle });
+        });
+
+        it('preserves a custom diagram title when changing diagram type', () => {
+            const diagram = wrapper.vm.model.detail.diagrams[0];
+            diagram.title = 'Custom title';
+
+            wrapper.vm.onDiagramTypeClick(0, 'CIA');
+
+            expect(diagram.title).toBe('Custom title');
+        });
+    });
+
+    it('finishes the editing session when the view unmounts', () => {
+        analytics.finishEditing.mockClear();
+        wrapper.destroy();
+        expect(analytics.finishEditing).toHaveBeenCalledTimes(1);
     });
 });

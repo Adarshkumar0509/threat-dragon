@@ -5,7 +5,7 @@ const fs = require('fs');
 require('dotenv').config({ path: process.env.ENV_FILE || path.resolve(__dirname, '../.env') });
 const serverApiProtocol = process.env.SERVER_API_PROTOCOL || 'http';
 const serverApiPort = process.env.SERVER_API_PORT || process.env.PORT || '3000';
-const PORT = process.env.APP_PORT || '8080';
+const appPort = process.env.APP_PORT || '8080';
 const appHostname = process.env.APP_HOSTNAME || 'localhost';
 console.log('Server API protocol: ' + serverApiProtocol + ' and port: ' + serverApiPort);
 
@@ -35,20 +35,20 @@ const proxyConfig = {
     },
 };
 
-// Configure dev server to use HTTPS with env.port if TLS credentials are available, otherwise use HTTP with port 8080
+// Configure dev server to use HTTPS with TLS credentials when available.
 const devServerConfig = hasTlsCredentials
     ? {
         https: {
             key: fs.readFileSync(process.env.APP_TLS_KEY_PATH),
             cert: fs.readFileSync(process.env.APP_TLS_CERT_PATH),
         },
-        port: PORT,
+        port: appPort,
         proxy: proxyConfig,
         allowedHosts: [appHostname],
     }
     : {
         // note that client webSocketURL config has been removed, as it was incompatible with desktop version
-        port: 8080,
+        port: appPort,
         proxy: proxyConfig,
         allowedHosts: [appHostname],
     };
@@ -85,10 +85,11 @@ module.exports = {
                 },
                 mac: {
                     category: 'public.app-category.developer-tools',
+                    executableName: 'Threat Dragon',
                     icon: './src/icons/icon.icns',
                     hardenedRuntime: true,
-                    entitlements: './node_modules/electron-builder-notarize/entitlements.mac.inherit.plist',
-                    entitlementsInherit: './node_modules/electron-builder-notarize/entitlements.mac.inherit.plist',
+                    entitlements: './node_modules/app-builder-lib/templates/entitlements.mac.plist',
+                    entitlementsInherit: './node_modules/app-builder-lib/templates/entitlements.mac.plist',
                     target: [
                         {
                             target: 'default',
@@ -151,6 +152,7 @@ module.exports = {
                 options.img = 'src';
                 options.image = 'xlink:href';
                 options.compilerOptions = {
+                    sourceMap: true,
                     ...options.compilerOptions,
                     // Sets the compatability mode to 2, meaning "vue 2"
                     // TODO: Once TODOs and additional warnings are sorted, we should
@@ -163,6 +165,13 @@ module.exports = {
     },
     configureWebpack: {
         devtool: 'source-map',
+        module: {
+            rules: [{
+                test: /linddun\.json$/,
+                // Preserve JSON data keys used by default imports in production builds.
+                parser: { exportsDepth: 0 }
+            }]
+        },
         plugins: [
             new CycloneDxWebpackPlugin(
                 {

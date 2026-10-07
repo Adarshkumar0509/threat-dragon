@@ -10,7 +10,9 @@ import router from './router/index.js';
 import desktopSave from './service/desktop/save.js';
 import { providerNames } from './service/provider/providers.js';
 import threatDragonV1 from './service/migration/tdV1/threatDragonV1';
+import { importOtm } from './service/migration/otm/otm';
 import { importTmbom } from './service/migration/tmBom/tmBom';
+import { translateKnownKey } from './service/i18n/translation.js';
 
 import schema from './service/schema/ajv';
 import storeFactory from './store/index.js';
@@ -22,7 +24,10 @@ import BootstrapVue from './plugins/bootstrap-vue.js';
 import { FontAwesomeIcon } from './plugins/fontawesome-vue.js';
 import Toast, { toastOptions, installToastGlobalProperties } from './plugins/toastification.js';
 
-const t = (...args) => i18nFactory.get().t(...args);
+const t = (...args) => {
+    const { t: translate } = i18nFactory.get();
+    return translate(...args);
+};
 
 const getConfirmModal = () => {
     return appProxy.$bvModal.msgBoxConfirm(t('forms.discardMessage'), {
@@ -84,7 +89,7 @@ window.electronAPI.onOpenModel((_event, fileName, jsonModel) => {
     let params;
 
     if (Object.prototype.hasOwnProperty.call(jsonModel, 'modelError')) {
-        appProxy.$toast.error(t('threatmodel.errors.' + jsonModel.modelError));
+        appProxy.$toast.error(translateKnownKey(t, `threatmodel.errors.${jsonModel.modelError}`));
         return;
     }
 
@@ -103,9 +108,10 @@ window.electronAPI.onOpenModel((_event, fileName, jsonModel) => {
             fileName = '';
             window.electronAPI.modelOpened(fileName);
         } else if (schema.isOtm(jsonModel)) {
-            console.error('Convert OTM to dragon format not yet supported');
-            appProxy.$toast.error(t('threatmodel.warnings.otmUnsupported'), { timeout: false });
-            return;
+            jsonModel = openOtm(jsonModel);
+            console.debug('force re-selection of file name for OTM');
+            fileName = '';
+            window.electronAPI.modelOpened(fileName);
         } else {
             console.warn('Model does not strictly match possible schemas: ' + JSON.stringify(schema.checkV2(jsonModel, null, 2)));
             appProxy.$toast.warning(t('threatmodel.warnings.jsonSchema'));
@@ -202,8 +208,14 @@ const localAuth = () => {
 
 const openTmBom = (jsonModel) => {
     console.info('Convert TM-BOM to internal TD format');
-    appProxy.$toast.warning(t('threatmodel.warnings.tmUnsupported'), { timeout: false });
+    appProxy.$toast.warning(t('threatmodel.warnings.tmBomImported'), { timeout: false });
     return importTmbom(jsonModel);
+};
+
+const openOtm = (jsonModel) => {
+    console.info('Convert OTM to internal TD format');
+    appProxy.$toast.warning(t('threatmodel.warnings.otmImported'), { timeout: false });
+    return importOtm(jsonModel);
 };
 
 const app = createApp(App);

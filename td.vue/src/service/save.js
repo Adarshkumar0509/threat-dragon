@@ -4,6 +4,13 @@ import googleDriveApi from '@/service/api/googleDriveApi';
 import i18n from '@/i18n/index.js';
 import threatmodelApi from '@/service/api/threatmodelApi';
 
+
+const desktop = (data, fileName) => {
+    const contents = JSON.parse(JSON.stringify(data));
+    window.electronAPI.modelSave(contents, fileName);
+    return true;
+};
+
 const google = async (rootState, state) => {
     try {
         await googleDriveApi.updateAsync(rootState.folder.selected, state.data);
@@ -44,27 +51,6 @@ const local = async (state) => {
         result = await downloadFile(state.data, `${state.data.summary.title}.json`);
         Vue.$toast.success(i18n.get().t('threatmodel.prompts.downloading'));
     }
-    return result;
-};
-
-//method used to save the tempalte locally
-const template = async (data, filename) => {
-    let result = false;
-    if ('showSaveFilePicker' in self) {
-        result = await writeFile(data, filename);
-        
-        if (result) {
-            Vue.$toast.success(i18n.get().t('template.prompts.templateSaved'));
-        } else {
-            Vue.$toast.warning(i18n.get().t('template.warnings.templateSave'));
-        }
-    } 
-   
-    else {
-        result = await downloadFile(data, filename);
-        Vue.$toast.success(i18n.get().t('template.prompts.templateDownloading'));
-    }
-
     return result;
 };
 
@@ -115,7 +101,6 @@ async function downloadFile(data, fileName) {
     const jsonData = JSON.stringify(data, null, 2);
     const blob = new Blob([jsonData], { type: contentType });
     const a = document.createElement('a');
-    console.debug('Save using browser local filesystem download');
 
     a.href = window.URL.createObjectURL(blob);
     a.download = fileName;
@@ -124,7 +109,7 @@ async function downloadFile(data, fileName) {
     return true;
 }
 
-async function writeFile(data, fileName) {
+export async function writeFile(data, fileName) {
     const jsonData = JSON.stringify(data, null, 2);
     let fileHandle = null;
     const options = {
@@ -156,7 +141,6 @@ async function writeFile(data, fileName) {
             return false;            
         }
         await writable.close();
-        console.debug('Save using browser file picker');
     } else {
         console.warn('Save failed, filesystem permissions not granted');
         return false;
@@ -182,10 +166,10 @@ async function verifyPermission(fileHandle) {
 }
 
 export default {
+    desktop,
     google,
     googleCreate,
     local,
     repo,
-    repoCreate,
-    template
+    repoCreate
 };

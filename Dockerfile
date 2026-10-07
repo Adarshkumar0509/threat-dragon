@@ -1,5 +1,5 @@
-# NPM: Base image with latest npm (in native host's platform)
-FROM --platform=$BUILDPLATFORM docker.io/library/node:24.16.0-alpine@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS build-npm-base
+# NPM: Base image with the pinned npm version (in native host's platform)
+FROM --platform=$BUILDPLATFORM docker.io/library/node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS build-npm-base
 WORKDIR /build
 
 # Copy over NPM config and enforce usage across all tool calls
@@ -7,11 +7,11 @@ WORKDIR /build
 COPY .npmrc /.npmrc
 ENV NPM_CONFIG_USERCONFIG=/.npmrc
 
-# Install latest npm
+# Keep npm aligned with GitHub Actions
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     --mount=type=tmpfs,target=/tmp \
     --mount=type=tmpfs,target=/usr/share/man \
-    npm i -g npm@latest
+    npm i -g npm@11.18.0
 
 
 # NPM: Stage 1: install dev-dependencies and build dist bundle
@@ -40,7 +40,7 @@ COPY ./td.vue/src/ ./td.vue/src/
 COPY ./td.vue/public/ ./td.vue/public/
 COPY ./td.vue/*.config.js ./td.vue/
 
-RUN mkdir -p td.vue/src/service/schema/api_json && \
+RUN mkdir -p td.vue/src/assets/downloads/cornucopia && \
     npm run build && \
     cd td.server && \
     npm run make-sbom
@@ -74,7 +74,7 @@ RUN cd td.server && \
 
 
 # Build Docs
-FROM --platform=$BUILDPLATFORM docker.io/library/ruby:4.0.5@sha256:bd5075f77ac998fa5b61e37842717d1a29482b0e02ab74e2a2a8ae371d121b32 AS build-docs
+FROM --platform=$BUILDPLATFORM docker.io/library/ruby:4.0.7@sha256:080c2f7eb143e91f36e1a5c9ad183283f9ac51239eaaeaffde95ddf124a0b2f6 AS build-docs
 RUN --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     --mount=type=tmpfs,target=/var/lib/dpkg \
     --mount=type=tmpfs,target=/var/cache \
@@ -83,26 +83,21 @@ RUN --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get install -y --no-install-recommends build-essential
 
 WORKDIR /build
+ENV BUNDLE_APP_CONFIG=/build/.bundle
 
 COPY docs/Gemfile docs/Gemfile.lock ./
+COPY docs/.bundle/ .bundle/
 RUN bundle install
 
 COPY docs/ .
+COPY package.json ./_data/package.json
 RUN bundle exec jekyll build -b ./docs/
 
 
-FROM docker.io/library/node:24.16.0-alpine@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS final
+FROM docker.io/library/node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS final
 
-# Copy over NPM config and enforce usage across all tool calls
-# Contains configuration regarding supply chain
-COPY .npmrc /.npmrc
-ENV NPM_CONFIG_USERCONFIG=/.npmrc
-
-# Install latest npm to shut up trivy
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    --mount=type=tmpfs,target=/tmp \
-    --mount=type=tmpfs,target=/usr/share/man \
-    npm i -g npm@latest
+# npm is needed only in the build stages. The runtime executes Node directly.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 WORKDIR /app
 

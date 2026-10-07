@@ -25,8 +25,7 @@
                     <b-col md=5>
                         <b-form-group id="status-group" class="float-left" :label="$t('threats.properties.status')"
                             label-for="status">
-                            <td-form-radio-group id="status" v-model="threat.status" :options="statuses"
-                                buttons></td-form-radio-group>
+                            <td-threat-status-selector id="status" v-model="threat.status"></td-threat-status-selector>
                         </b-form-group>
                     </b-col>
 
@@ -90,19 +89,23 @@
 <script>
 import { mapState } from 'vuex';
 import { createNewTypedThreat } from '@/service/threats/index.js';
-import { CELL_DATA_UPDATED } from '@/store/actions/cell.js';
+import { cellDataUpdated } from '@/store/actions/cell.js';
 import tmActions from '@/store/actions/threatmodel.js';
 import dataChanged from '@/service/x6/graph/data-changed.js';
 import threatModels from '@/service/threats/models/index.js';
 import TdFormRadioGroup from '@/components/FormRadioGroup.vue';
 import TdFormSelect from '@/components/FormSelect.vue';
+import TdThreatStatusSelector from '@/components/ThreatStatusSelector.vue';
 import { GetContextSuggestions } from '@/service/threats/oats/context-generator.js';
 import { v4 as uuidv4 } from 'uuid';
+import analytics from '@/service/analytics.js';
+import { translateKnownKey } from '@/service/i18n/translation.js';
 export default {
     name: 'TdThreatSuggest',
     components: {
         TdFormRadioGroup,
-        TdFormSelect
+        TdFormSelect,
+        TdThreatStatusSelector
     },
     computed: {
         ...mapState({
@@ -116,16 +119,9 @@ export default {
             const res = [];
             const threattypes = threatModels.getThreatTypesByElement(this.modelType, this.cellRef.data.type);
             Object.keys(threattypes).forEach((type) => {
-                res.push(this.$t(type));
+                res.push(translateKnownKey(this.$t, type));
             }, this);
             return res;
-        },
-        statuses() {
-            return [
-                { value: 'NotApplicable', text: this.$t('threats.status.notApplicable') },
-                { value: 'Open', text: this.$t('threats.status.open') },
-                { value: 'Mitigated', text: this.$t('threats.status.mitigated') }
-            ];
         },
         priorities() {
             return [
@@ -143,12 +139,14 @@ export default {
             suggestions: [],
             types: [],
             threat: {},
-            index: 0
+            index: 0,
+            suggestionSource: null
         };
     },
     methods: {
         showModal(type) {
             this.index = 0;
+            this.suggestionSource = type;
             const tmpThreat = createNewTypedThreat(this.modelType, this.cellRef.data.type, this.threatTop + 1);
             this.types = [...this.threatTypes];
             if (type == 'type') {
@@ -160,7 +158,7 @@ export default {
             } else {
                 this.suggestions = GetContextSuggestions(this.cellRef.data, this.modelType).map((suggestion) => {
                     tmpThreat.title = suggestion.title;
-                    tmpThreat.type = this.$t(suggestion.type);
+                    tmpThreat.type = translateKnownKey(this.$t, suggestion.type);
                     if (!this.types.includes(tmpThreat.type) && tmpThreat.type !== '')
                         this.types.push(tmpThreat.type);
                     tmpThreat.description = suggestion.description;
@@ -178,6 +176,7 @@ export default {
             this.suggestions = [];
             this.types = [];
             this.index = 0;
+            this.suggestionSource = null;
             this.$refs.editModal.hide();
         },
         next() {
@@ -200,7 +199,7 @@ export default {
             }
             if (objRef.threatFrequency) {
                 Object.keys(objRef.threatFrequency).forEach((k) => {
-                    if (this.$t(`threats.model.${this.modelType.toLowerCase()}.${k}`) === this.threat.type && this.threatTypes.includes(this.threat.type))
+                    if (translateKnownKey(this.$t, `threats.model.${this.modelType.toLowerCase()}.${k}`) === this.threat.type && this.threatTypes.includes(this.threat.type))
                         objRef.threatFrequency[k]++;
                 });
             }
@@ -209,8 +208,9 @@ export default {
             this.cellRef.data.hasOpenThreats = this.cellRef.data.threats.length > 0;
             this.$store.dispatch(tmActions.update, { threatTop: this.threatTop + 1 });
             this.$store.dispatch(tmActions.modified);
-            this.$store.dispatch(CELL_DATA_UPDATED, this.cellRef.data);
+            this.$store.dispatch(cellDataUpdated, this.cellRef.data);
             dataChanged.updateStyleAttrs(this.cellRef);
+            analytics.track('THREAT_SUGGESTION_APPLIED', { source: this.suggestionSource });
             this.next();
 
         },

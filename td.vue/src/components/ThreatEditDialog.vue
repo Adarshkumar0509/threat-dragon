@@ -146,12 +146,10 @@
                             :label="$t('threats.properties.status')"
                             label-for="status"
                         >
-                            <td-form-radio-group
+                            <td-threat-status-selector
                                 id="status"
                                 v-model="threat.status"
-                                :options="statuses"
-                                buttons
-                            ></td-form-radio-group>
+                            ></td-threat-status-selector>
                         </b-form-group>
                     </b-col>
 
@@ -263,19 +261,23 @@
 <script>
 import { mapState } from 'vuex';
 
-import { CELL_DATA_UPDATED } from '@/store/actions/cell.js';
+import { cellDataUpdated } from '@/store/actions/cell.js';
 import tmActions from '@/store/actions/threatmodel.js';
 import dataChanged from '@/service/x6/graph/data-changed.js';
 import threatModels from '@/service/threats/models/index.js';
 import TdFormRadioGroup from '@/components/FormRadioGroup.vue';
 import TdFormSelect from '@/components/FormSelect.vue';
+import TdThreatStatusSelector from '@/components/ThreatStatusSelector.vue';
 import { getGame, getAllGames } from '../service/threats/models/eop';
+import analytics from '@/service/analytics.js';
+import { translateKnownKey } from '@/service/i18n/translation.js';
 
 export default {
     name: 'TdThreatEditDialog',
     components: {
         TdFormRadioGroup,
-        TdFormSelect
+        TdFormSelect,
+        TdThreatStatusSelector
     },
     computed: {
         ...mapState({
@@ -293,23 +295,10 @@ export default {
                 this.cellRef.data.type
             );
             Object.keys(threatTypes).forEach((type) => {
-                res.push(this.$t(type));
+                res.push(translateKnownKey(this.$t, type));
             }, this);
             if (!res.includes(this.threat.type)) res.push(this.threat.type);
             return res;
-        },
-        statuses() {
-            return [
-                {
-                    value: 'NotApplicable',
-                    text: this.$t('threats.status.notApplicable'),
-                },
-                { value: 'Open', text: this.$t('threats.status.open') },
-                {
-                    value: 'Mitigated',
-                    text: this.$t('threats.status.mitigated'),
-                },
-            ];
         },
         priorities() {
             return [
@@ -444,6 +433,7 @@ export default {
                 (x) => x.id === this.threat.id
             );
             if (threatRef) {
+                const previousStatus = threatRef.status;
                 const objRef = this.cellRef.data;
                 if (!objRef.threatFrequency) {
                     const tmpfreq = threatModels.getFrequencyMapByElement(
@@ -455,7 +445,7 @@ export default {
                 if (objRef.threatFrequency) {
                     Object.keys(objRef.threatFrequency).forEach((k) => {
                         if (
-                            this.$t(
+                            translateKnownKey(this.$t,
                                 `threats.model.${this.threat.modelType.toLowerCase()}.${k}`
                             ) === this.threat.type
                         )
@@ -478,18 +468,25 @@ export default {
                 } else {
                     threatRef.type = this.threat.type;
                 }
-                this.$store.dispatch(CELL_DATA_UPDATED, this.cellRef.data);
+                this.$store.dispatch(cellDataUpdated, this.cellRef.data);
                 this.$store.dispatch(tmActions.modified);
                 dataChanged.updateStyleAttrs(this.cellRef);
+                if (!this.newThreat) {
+                    analytics.track('THREAT_UPDATED', { status: this.threat.status });
+                    if (previousStatus !== this.threat.status) {
+                        analytics.track('THREAT_STATUS_UPDATED', { status: this.threat.status });
+                    }
+                }
             }
             this.hideModal();
         },
         deleteThreat() {
+            const threatExists = this.cellRef.data.threats.some((x) => x.id === this.threat.id);
             if (!this.threat.new && this.cellRef.data.threatFrequency) {
                 const threatMap = this.cellRef.data.threatFrequency;
                 Object.keys(threatMap).forEach((k) => {
                     if (
-                        this.$t(
+                        translateKnownKey(this.$t,
                             `threats.model.${this.threat.modelType.toLowerCase()}.${k}`
                         ) === this.threat.type
                     )
@@ -501,9 +498,10 @@ export default {
             );
             this.cellRef.data.hasOpenThreats =
                 this.cellRef.data.threats.length > 0;
-            this.$store.dispatch(CELL_DATA_UPDATED, this.cellRef.data);
+            this.$store.dispatch(cellDataUpdated, this.cellRef.data);
             this.$store.dispatch(tmActions.modified);
             dataChanged.updateStyleAttrs(this.cellRef);
+            if (threatExists) analytics.track('THREAT_DELETED', { status: this.threat.status });
         },
         hideModal() {
             this.$refs.editModal.hide();

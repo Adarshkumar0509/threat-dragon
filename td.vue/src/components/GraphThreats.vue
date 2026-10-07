@@ -44,7 +44,7 @@
                     :title="statusResolved"
                 />
                 <font-awesome-icon
-                    v-if="statusResolved === 'Mitigated'"
+                    v-if="isStatusResolved"
                     icon="check"
                     class="threat-icon green-icon"
                     :title="statusResolved"
@@ -89,9 +89,9 @@
             </b-col>
 
             <b-col align-h="end">
-                <b-badge v-if="modelTypeResolved">
+                <td-badge v-if="modelTypeResolved">
                     {{ modelTypeResolved === 'EOP' ? 'EoP' : modelTypeResolved }}
-                </b-badge>
+                </td-badge>
             </b-col>
         </b-row>
     </b-card-text>
@@ -138,10 +138,15 @@
 </style>
 
 <script>
+import TdBadge from '@/components/Badge.vue';
 import { getGame } from '../service/threats/models/eop';
+import { isResolved } from '@/service/threats/status.js';
 
 export default {
     name: 'TdGraphThreats',
+    components: {
+        TdBadge
+    },
 
     props: {
         threat: {
@@ -182,6 +187,7 @@ export default {
 
         idResolved() { return this.threatData.id; },
         statusResolved() { return this.threatData.status; },
+        isStatusResolved() { return isResolved(this.statusResolved); },
         severityResolved() { return this.threatData.severity; },
         descriptionResolved() { return this.threatData.description; },
         titleResolved() { return this.threatData.title; },

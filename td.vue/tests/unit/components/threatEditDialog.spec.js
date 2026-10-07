@@ -5,7 +5,13 @@ import Vuex from 'vuex';
 import dataChanged from '@/service/x6/graph/data-changed.js';
 import TdFormRadioGroup from '@/components/FormRadioGroup.vue';
 import TdFormSelect from '@/components/FormSelect.vue';
+import TdThreatStatusSelector from '@/components/ThreatStatusSelector.vue';
 import TdThreatEditDialog from '@/components/ThreatEditDialog.vue';
+import analytics from '@/service/analytics.js';
+
+jest.mock('@/service/analytics.js', () => ({
+    track: jest.fn()
+}));
 
 describe('components/ThreatEditDialog.vue', () => {
     let localVue, mockStore, wrapper;
@@ -27,13 +33,15 @@ describe('components/ThreatEditDialog.vue', () => {
 
     const getStore = () => new Vuex.Store({
         state: { cell: { ref: { getData: jest.fn(), data: { threatFrequency:{availability: 0, confidentiality: 0, integrity: 0}, threats: [ getThreatData() ]}}}},
-        actions: { CELL_DATA_UPDATED: () => {} }
+        actions: { cellDataUpdated: () => {} }
     });
 
     beforeEach(() => {
+        console.warn = jest.fn();
         localVue = createLocalVue();
         localVue.use(Vuex);
         localVue.use(BootstrapVue);
+        analytics.track.mockClear();
     });
 
     const getWrapper = () => shallowMount(TdThreatEditDialog, {
@@ -88,12 +96,12 @@ describe('components/ThreatEditDialog.vue', () => {
             expect(input.exists()).toEqual(true);
         });
 
-        it('has a status input', () => {
-            const input = wrapper.findAllComponents(TdFormRadioGroup)
+        it('has a threat status selector', () => {
+            const selector = wrapper.findAllComponents(TdThreatStatusSelector)
                 .filter(x => x.attributes('id') === 'status')
                 .at(0);
 
-            expect(input.exists()).toEqual(true);
+            expect(selector.exists()).toEqual(true);
         });
 
         it('has a score input', () => {
@@ -172,6 +180,10 @@ describe('components/ThreatEditDialog.vue', () => {
             it('hides the modal', () => {
                 expect(wrapper.vm.hideModal).toHaveBeenCalled();
             });
+
+            it('tracks a deleted threat without its contents', () => {
+                expect(analytics.track).toHaveBeenCalledWith('THREAT_DELETED', { status: 'Open' });
+            });
         });
     });
 
@@ -194,6 +206,33 @@ describe('components/ThreatEditDialog.vue', () => {
         it('updates the styles', () => {
             expect(dataChanged.updateStyleAttrs).toHaveBeenCalledTimes(1);
         });
+
+        it('tracks an existing threat update without its contents', () => {
+            expect(analytics.track).toHaveBeenCalledWith('THREAT_UPDATED', { status: 'Open' });
+        });
+
+        it('tracks an allowlisted status when the status changes', () => {
+            analytics.track.mockClear();
+            wrapper.vm.threat.status = 'Accepted';
+            wrapper.vm.updateThreat();
+            expect(analytics.track).toHaveBeenCalledWith('THREAT_STATUS_UPDATED', { status: 'Accepted' });
+        });
+
+        it('does not track a new threat as an update', () => {
+            analytics.track.mockClear();
+            wrapper.vm.newThreat = true;
+            wrapper.vm.updateThreat();
+            expect(analytics.track).not.toHaveBeenCalled();
+        });
+    });
+
+    it('does not track deletion when the threat does not exist', () => {
+        wrapper = getWrapper();
+        wrapper.vm.threat = { id: 'missing', modelType: 'CIA', new: false };
+        dataChanged.updateStyleAttrs = jest.fn();
+        mockStore.dispatch = jest.fn();
+        wrapper.vm.deleteThreat();
+        expect(analytics.track).not.toHaveBeenCalled();
     });
 
     describe('cornucopia link', () => {
@@ -248,7 +287,7 @@ describe('components/ThreatEditDialog.vue', () => {
                     threatFrequency:{availability:0, confidentiality:0, integrity:0},
                     threats:[ getThreatData() ]
                 }}}},
-                actions:{CELL_DATA_UPDATED:() => {}}
+                actions:{cellDataUpdated:() => {}}
             });
             wrapper = shallowMount(TdThreatEditDialog, {localVue, mocks:{$t:key => key}, store});
             wrapper.vm.$refs.editModal={show:jest.fn(), hide:jest.fn()};

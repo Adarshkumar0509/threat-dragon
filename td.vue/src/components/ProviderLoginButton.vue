@@ -13,7 +13,7 @@
             ></font-awesome-icon>
         </span>
         <span>
-            {{ $t('providers.' + provider.key + '.loginWith') }} {{ $t('providers.' + provider.key + '.displayName') }}
+            {{ providerLogin }} {{ providerDisplayName }}
         </span>
     </b-btn>
 </template>
@@ -26,22 +26,27 @@
 
 <script>
 import { providerNames } from '@/service/provider/providers.js';
-import { AUTH_SET_LOCAL } from '@/store/actions/auth.js';
+import { authSetLocal } from '@/store/actions/auth.js';
 import loginApi from '@/service/api/loginApi.js';
-import { PROVIDER_SELECTED } from '@/store/actions/provider.js';
+import { providerSelected } from '@/store/actions/provider.js';
+import { translateProviderDisplayName, translateProviderLogin } from '@/service/i18n/translation.js';
 
 export default {
     name: 'TdProviderLoginButton',
     props: {
         provider: Object
     },
+    computed: {
+        providerDisplayName() { return translateProviderDisplayName(this.$t, this.provider.key); },
+        providerLogin() { return translateProviderLogin(this.$t, this.provider.key); }
+    },
     methods: {
         async onProviderClick() {
             console.debug('login with provider: ' + this.provider.key);
-            await this.$store.dispatch(PROVIDER_SELECTED, this.provider.key);
+            await this.$store.dispatch(providerSelected, this.provider.key);
 
             if (this.provider.key === providerNames.local || this.provider.key === providerNames.desktop) {
-                this.$store.dispatch(AUTH_SET_LOCAL);
+                this.$store.dispatch(authSetLocal);
                 return this.$router.push('/dashboard');
             }
           

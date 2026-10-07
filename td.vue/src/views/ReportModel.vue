@@ -126,7 +126,7 @@
                     <td-form-button
                         id="td-print-pdf-btn"
                         :onBtnClick="printPdf"
-                        v-if="isElectron"
+                        v-if="isDesktopApp"
                         icon="file-pdf"
                         :text="$t('forms.exportPdf')" />
                     <td-form-button
@@ -152,6 +152,8 @@
                     :owner="model.summary.owner"
                     :reviewer="model.detail.reviewer"
                     :contributors="contributors"
+                    :releaseVersion="model.release_version"
+                    :releaseDate="model.released_at"
                     :branding="display.branding"
                 ></td-print-coversheet>
             </div>
@@ -226,7 +228,7 @@
 
 <script>
 import { mapState, mapGetters } from 'vuex';
-import isElectron from 'is-electron';
+import { isDesktopApp } from '@/service/environment';
 
 import { getProviderType } from '@/service/provider/providers.js';
 import TdCoversheet from '@/components/report/Coversheet.vue';
@@ -236,6 +238,7 @@ import TdFormButton from '@/components/FormButton.vue';
 import TdPrintCoversheet from '@/components/printed-report/Coversheet.vue';
 import TdPrintExecutiveSummary from '@/components/printed-report/ExecutiveSummary.vue';
 import threatService from '@/service/threats/index.js';
+import analytics from '@/service/analytics.js';
 
 export default {
     name: 'ReportModel',
@@ -257,7 +260,7 @@ export default {
                 properties: false,
                 branding: false
             },
-            isElectron: isElectron()
+            isDesktopApp: isDesktopApp()
         };
     },
     computed: {
@@ -293,11 +296,12 @@ export default {
         },
         print() {
             console.debug('Print the report window');
+            analytics.track('THREAT_MODEL_REPORT_PRINT_REQUESTED', { format: 'PRINT' });
             window.print();
         },
         printPdf() {
             console.debug('Export the report window to PDF (desktop only)');
-            if (isElectron()) {
+            if (isDesktopApp()) {
                 // request electron server to print PDF
                 window.electronAPI.modelPrint('PDF');
             }

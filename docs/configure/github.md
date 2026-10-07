@@ -33,6 +33,10 @@ and 'test' alters the functionality from what is being tested.
 
 - `NODE_ENV='development'`
 
+Note: when `NODE_ENV` is set to `development`, the OAuth redirect is hard-coded to
+`http://localhost:8080`. If the frontend runs on a different host or port,
+set `OAUTH_FRONTEND_RETURN_URL` to the correct base URL instead.
+
 Server port number - this defaults to 3000, and it can be mapped to another port when running the docker command.
 So leave the server port at 3000 by not defining it, and it can then be mapped to external port 8080 using docker.
 
@@ -189,51 +193,6 @@ or if using Windows:
 
 - `docker run -d -p 8080:3000 -v %CD%/test.env:/app/.env owasp/threat-dragon:stable`
 
-### Template Repository Configuration
-
-Threat Dragon supports organization-wide templates that can be shared across all users.
-Templates are stored in a dedicated GitHub repository and managed by administrators.
-
-#### Setting up the Template Repository
-
-1. Create a new GitHub repository for templates (e.g., `my-org/threat-dragon-templates`)
-2. The repository can be public or private (users must have read access)
-3. Add the environment variable to your configuration:
-
-```sh
-GITHUB_CONTENT_REPO=my-org/threat-dragon-templates
-```
-
-#### Administrator Access
-
-Template management (import, update, delete, bootstrap) requires administrator privileges.
-A user is considered an administrator if they have __push__ or __admin__ permissions on the `GITHUB_CONTENT_REPO`.
-
-#### Branch Protection Requirements
-
-Templates are stored on the `main` branch of the content repository.
-If you have branch protection enabled on `main`:
-
-1. Go to Repository Settings → Branches → Branch protection rules
-2. Edit the protection rule for `main`
-3. Either:
-   - Uncheck "Do not allow bypassing the above settings" to allow admin bypass, OR
-   - Add template administrators to "Allow specific actors to bypass required pull requests"
-
-__Note__: Without bypass permissions, administrators will receive 403 errors when attempting to manage templates.
-
-#### Template Repository Structure
-
-Once initialized, the template repository will have the following structure:
-
-```text
-templates/
-├── template_info.json       # Metadata index file
-├── {modelRef-1}.json        # Template content files
-├── {modelRef-2}.json
-└── ...
-```
-
 ### Github environment variables
 
 | Github specifics | Description | Default |
@@ -247,7 +206,6 @@ templates/
 | `GITHUB_USE_SEARCH` | Optional, if true it will only display the github repos matching the search query below| `false`|
 | `GITHUB_SEARCH_QUERY` | Optionally specifies the search query to use when searching for Threat Dragon github repos | |
 | `GITHUB_REPO_ROOT_DIRECTORY` | Optional path where saved models are stored in a Github repo | |
-| `GITHUB_CONTENT_REPO` | Optional GitHub repository for organization-wide templates (e.g., `org/templates-repo`) | |
 
 ### Example production github environment
 

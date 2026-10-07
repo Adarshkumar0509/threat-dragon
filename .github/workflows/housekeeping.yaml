@@ -5,9 +5,6 @@ on:
     - cron: '45 6 * * *'
   workflow_dispatch:
 
-env:
-  IMAGE_NAME: threatdragon/owasp-threat-dragon:latest
-
 # for security reasons the github actions are pinned to specific SHAs
 jobs:
   chores:
@@ -18,21 +15,12 @@ jobs:
       contents: read
     steps:
       - name: Delete stale workflow runs
-        uses: Mattraks/delete-workflow-runs@5bf9a1dac5c4d041c029f0a8370ddf0c5cb5aeb7 # v2.1.0
+        uses: Mattraks/delete-workflow-runs@b3018382ca039b53d238908238bd35d1fb14f8ee # v2.1.0
         with:
           token: ${{ github.token }}
           repository: ${{ github.repository }}
           retain_days: 28
           keep_minimum_runs: 10
-
-      - name: Delete unused workflows
-        uses: otto-de/purge-deprecated-workflow-runs@4781dc30eb7236b195e896b9a26b14296341b63a # v4.0.10
-        with:
-          token: ${{ github.token }}
-          remove-obsolete: true
-          remove-failed: true
-          remove-older-than: 2w2w *
-          remove-skipped: true
 
   stale:
     name: Tidy pull requests
@@ -42,7 +30,7 @@ jobs:
       issues: write
     steps:
       - name: Tidy stale PRs and issues
-        uses: actions/stale@eb5cf3af3ac0a1aa4c9c45633dd1ae542a27a899 # v10.3.0
+        uses: actions/stale@1e223db275d687790206a7acac4d1a11bd6fe629 # v10.4.0
         with:
           days-before-issue-stale: 183
           days-before-issue-close: -1
@@ -55,40 +43,24 @@ jobs:
           close-pr-message: 'This PR was closed because it has been stalled for 4 weeks with no activity'
 
   trivy:
-    name: Scan with Trivy
-    runs-on: ubuntu-24.04
+    name: Trivy scan
     permissions:
       contents: read
       security-events: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: main
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: '${{ env.IMAGE_NAME }}'
-          format: 'template'
-          template: '@/contrib/sarif.tpl'
-          trivyignores: '.github/workflows/.trivyignore'
-          output: 'trivy-results.sarif'
-
-      - name: Upload scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
-        with:
-          sarif_file: 'trivy-results.sarif'
+    uses: ./.github/workflows/vulnerability-scan.yaml
+    with:
+      image-ref: threatdragon/owasp-threat-dragon:latest
+      checkout-ref: main
 
   link_checker:
     name: Link checker
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout markdown
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Link Checker
-        uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411 # v2.8.0
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: >-
             --verbose

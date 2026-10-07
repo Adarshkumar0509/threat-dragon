@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 
-import { ERROR_CODES } from '../../src/constants/errorCodes.js';
+import { errorCodes } from '../../src/constants/errorCodes.js';
 import { getConfig } from '../../src/controllers/configcontroller.js';
 import {
     buildConfig,
@@ -55,35 +55,35 @@ describe('config.helper.js', () => {
             const result = parseLocalesArray(null);
             expect(result.value).to.be.null;
             expect(result.errors).to.have.length(1);
-            expect(result.errors[0].code).to.equal(ERROR_CODES.CONFIG_LOCALE_MISSING);
+            expect(result.errors[0].code).to.equal(errorCodes.CONFIG_LOCALE_MISSING);
         });
 
         it('returns null value with error when raw is undefined', () => {
             const result = parseLocalesArray(undefined);
             expect(result.value).to.be.null;
             expect(result.errors).to.have.length(1);
-            expect(result.errors[0].code).to.equal(ERROR_CODES.CONFIG_LOCALE_MISSING);
+            expect(result.errors[0].code).to.equal(errorCodes.CONFIG_LOCALE_MISSING);
         });
 
         it('returns null value with error when JSON is malformed', () => {
             const result = parseLocalesArray('not-json');
             expect(result.value).to.be.null;
             expect(result.errors).to.have.length(1);
-            expect(result.errors[0].code).to.equal(ERROR_CODES.CONFIG_LOCALE_PARSE);
+            expect(result.errors[0].code).to.equal(errorCodes.CONFIG_LOCALE_PARSE);
         });
 
         it('returns null value with error when JSON is not an array', () => {
             const result = parseLocalesArray('"hello"');
             expect(result.value).to.be.null;
             expect(result.errors).to.have.length(1);
-            expect(result.errors[0].code).to.equal(ERROR_CODES.CONFIG_LOCALE_NOT_ARRAY);
+            expect(result.errors[0].code).to.equal(errorCodes.CONFIG_LOCALE_NOT_ARRAY);
         });
 
         it('returns null value with error when JSON is an object', () => {
             const result = parseLocalesArray('{"a":"b"}');
             expect(result.value).to.be.null;
             expect(result.errors).to.have.length(1);
-            expect(result.errors[0].code).to.equal(ERROR_CODES.CONFIG_LOCALE_NOT_ARRAY);
+            expect(result.errors[0].code).to.equal(errorCodes.CONFIG_LOCALE_NOT_ARRAY);
         });
 
         it('returns empty array with no errors for empty JSON array', () => {
@@ -96,15 +96,15 @@ describe('config.helper.js', () => {
             const result = parseLocalesArray('["en", 123, null, "pt"]');
             expect(result.value).to.deep.equal(['en', 'pt']);
             expect(result.errors).to.have.length(2);
-            expect(result.errors[0].code).to.equal(ERROR_CODES.CONFIG_LOCALE_TYPE);
-            expect(result.errors[1].code).to.equal(ERROR_CODES.CONFIG_LOCALE_TYPE);
+            expect(result.errors[0].code).to.equal(errorCodes.CONFIG_LOCALE_TYPE);
+            expect(result.errors[1].code).to.equal(errorCodes.CONFIG_LOCALE_TYPE);
         });
 
         it('rejects entries that fail format validation', () => {
             const result = parseLocalesArray('["en", "zh-Hans-CN", "pt"]');
             expect(result.value).to.deep.equal(['en', 'pt']);
             expect(result.errors).to.have.length(1);
-            expect(result.errors[0].code).to.equal(ERROR_CODES.CONFIG_LOCALE_FORMAT);
+            expect(result.errors[0].code).to.equal(errorCodes.CONFIG_LOCALE_FORMAT);
         });
 
         it('canonicalizes case-variant locales', () => {
@@ -210,7 +210,7 @@ describe('config.helper.js', () => {
                     LOCALE_DEFAULT: '-'
                 });
                 expect(errors).to.have.length(1);
-                expect(errors[0].code).to.equal(ERROR_CODES.CONFIG_LOCALE_FORMAT);
+                expect(errors[0].code).to.equal(errorCodes.CONFIG_LOCALE_FORMAT);
                 expect(errors[0].meta.locale).to.equal('-');
             });
 
@@ -219,7 +219,7 @@ describe('config.helper.js', () => {
                     LOCALES_ALLOWED: '["en"]',
                     LOCALE_DEFAULT: null
                 });
-                const formatErrors = errors.filter((e) => e.code === ERROR_CODES.CONFIG_LOCALE_FORMAT);
+                const formatErrors = errors.filter((e) => e.code === errorCodes.CONFIG_LOCALE_FORMAT);
                 expect(formatErrors).to.be.empty;
             });
 
@@ -227,7 +227,7 @@ describe('config.helper.js', () => {
                 const { value, errors } = buildConfig({});
                 expect(value.allowedLocales).to.deep.equal([]);
                 expect(errors).to.have.length(1);
-                expect(errors[0].code).to.equal(ERROR_CODES.CONFIG_LOCALE_MISSING);
+                expect(errors[0].code).to.equal(errorCodes.CONFIG_LOCALE_MISSING);
             });
 
             it('auto-merges default into allowedLocales when allowedLocales is empty array', () => {
@@ -236,7 +236,7 @@ describe('config.helper.js', () => {
                 });
                 expect(value.allowedLocales).to.deep.equal([]);
                 expect(errors).to.have.length(1);
-                expect(errors[0].code).to.equal(ERROR_CODES.CONFIG_LOCALE_MISSING);
+                expect(errors[0].code).to.equal(errorCodes.CONFIG_LOCALE_MISSING);
             });
 
             it('auto-merges default into allowedLocales when LOCALES_ALLOWED is empty array', () => {
@@ -292,6 +292,11 @@ describe('config.helper.js', () => {
                 githubEnabled: false,
                 gitlabEnabled: false,
                 googleEnabled: false,
+                analytics: {
+                    enabled: false,
+                    dashboardUrl: null,
+                    eventNames: []
+                },
                 localEnabled: true,
                 allowedLocales: ['en', 'es'],
                 defaultLocale: 'es'
@@ -305,6 +310,11 @@ describe('config.helper.js', () => {
             expect(result.githubEnabled).to.be.false;
             expect(result.gitlabEnabled).to.be.false;
             expect(result.googleEnabled).to.be.false;
+            expect(result.analytics).to.deep.equal({
+                enabled: false,
+                dashboardUrl: null,
+                eventNames: []
+            });
             expect(result.localEnabled).to.be.true;
             expect(result.allowedLocales).to.deep.equal([]);
             expect(result.defaultLocale).to.equal('en');
@@ -316,6 +326,17 @@ describe('config.helper.js', () => {
             });
             const result = getConfig();
             expect(result.allowedLocales).to.deep.equal(['en', 'pt-BR']);
+        });
+
+        it('exposes analytics only after server configuration enables it', () => {
+            sinon.stub(env, 'get').returns({
+                config: {
+                    PLAUSIBLE_ENABLED: true,
+                    PLAUSIBLE_DASHBOARD_URL: 'https://plausible.test/share/threatdragon'
+                }
+            });
+            const result = getConfig();
+            expect(result.analytics.eventNames).to.not.be.empty;
         });
     });
 });
